@@ -13,6 +13,10 @@ on:
         description: Pull request number
         required: true
         type: string
+      installation_id:
+        description: Optional GitHub App installation ID override
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -23,6 +27,7 @@ jobs:
     env:
       REPO: ${{ github.event.client_payload.repo || inputs.repo }}
       PR_NUMBER: ${{ github.event.client_payload.pr_number || inputs.pr_number }}
+      GH_APP_INSTALLATION_ID: ${{ github.event.client_payload.installation_id || inputs.installation_id || vars.GH_APP_INSTALLATION_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -52,12 +57,107 @@ jobs:
 
       - name: Create GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ vars.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
-          owner: ${{ steps.target-repo.outputs.owner }}
-          repositories: ${{ steps.target-repo.outputs.repo }}
+        shell: bash
+        env:
+          GH_APP_ID: ${{ vars.GH_APP_ID }}
+          GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          TARGET_OWNER: ${{ steps.target-repo.outputs.owner }}
+          TARGET_REPO: ${{ steps.target-repo.outputs.repo }}
+        run: |
+          if [[ -z "${GH_APP_ID:-}" || -z "${GH_APP_PRIVATE_KEY:-}" ]]; then
+            echo "GH_APP_ID variable and GH_APP_PRIVATE_KEY secret must be configured" >&2
+            exit 1
+          fi
+
+          make_request() {
+            local method="$1"
+            local url="$2"
+            local auth_token="$3"
+            local body="${4:-}"
+            local response_file
+            response_file=$(mktemp)
+
+            local http_code
+            if [[ -n "$body" ]]; then
+              http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+                -X "$method" \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $auth_token" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$url" \
+                -d "$body")
+            else
+              http_code=$(curl -sS -o "$response_file" -w '%{http_code}' \
+                -X "$method" \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $auth_token" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "$url")
+            fi
+
+            if [[ "$http_code" -lt 200 || "$http_code" -ge 300 ]]; then
+              echo "GitHub API request failed: $method $url (HTTP $http_code)" >&2
+              cat "$response_file" >&2
+              rm -f "$response_file"
+              return 1
+            fi
+
+            cat "$response_file"
+            rm -f "$response_file"
+          }
+
+          app_jwt=$(node <<'NODE'
+          const crypto = require('crypto');
+
+          const appId = process.env.GH_APP_ID;
+          const privateKey = process.env.GH_APP_PRIVATE_KEY.replace(/\\n/g, '\n');
+          const now = Math.floor(Date.now() / 1000);
+
+          const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+          const header = encode({ alg: 'RS256', typ: 'JWT' });
+          const payload = encode({ iat: now - 60, exp: now + 540, iss: appId });
+
+          const signer = crypto.createSign('RSA-SHA256');
+          signer.update(`${header}.${payload}`);
+          signer.end();
+
+          process.stdout.write(`${header}.${payload}.${signer.sign(privateKey).toString('base64url')}`);
+          NODE
+          )
+
+          installation_id="${GH_APP_INSTALLATION_ID:-}"
+          if [[ -z "$installation_id" ]]; then
+            for path in \
+              "$GITHUB_API_URL/repos/$TARGET_OWNER/$TARGET_REPO/installation" \
+              "$GITHUB_API_URL/orgs/$TARGET_OWNER/installation" \
+              "$GITHUB_API_URL/users/$TARGET_OWNER/installation"
+            do
+              if response=$(make_request GET "$path" "$app_jwt" 2>/dev/null); then
+                installation_id=$(printf '%s' "$response" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(String(JSON.parse(data).id || '')));")
+                break
+              fi
+            done
+          fi
+
+          if [[ -z "$installation_id" ]]; then
+            echo "Unable to find a GitHub App installation for $TARGET_OWNER/$TARGET_REPO. Install the app on the owner or provide GH_APP_INSTALLATION_ID/installation_id." >&2
+            exit 1
+          fi
+
+          token_response=$(make_request POST "$GITHUB_API_URL/app/installations/$installation_id/access_tokens" "$app_jwt")
+          installation_token=$(printf '%s' "$token_response" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).token));")
+
+          if [[ -z "$installation_token" ]]; then
+            echo "Failed to create an installation access token for installation $installation_id" >&2
+            exit 1
+          fi
+
+          if ! make_request GET "$GITHUB_API_URL/repos/$TARGET_OWNER/$TARGET_REPO" "$installation_token" >/dev/null 2>&1; then
+            echo "Created an installation token, but the app still cannot access $TARGET_OWNER/$TARGET_REPO. Ensure the installation includes that repository." >&2
+            exit 1
+          fi
+
+          echo "token=$installation_token" >> "$GITHUB_OUTPUT"
 
       - name: Run review
         working-directory: ${{ github.workspace }}
