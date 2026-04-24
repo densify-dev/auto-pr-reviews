@@ -1,0 +1,37 @@
+name: Central PR Review
+
+on:
+  repository_dispatch:
+    types: [pr-review-request]
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: Repository in owner/name format
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.event.client_payload.repo || inputs.repo }}
+      PR_NUMBER: ${{ github.event.client_payload.pr_number || inputs.pr_number }}
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install OpenCode
+        run: npm install -g opencode-ai@latest
+
+      - name: Run review
+        run: |
+          opencode run "say $REPO $PR_NUMBER" --model opencode/big-pickle
