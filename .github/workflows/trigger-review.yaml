@@ -35,9 +35,33 @@ jobs:
       - name: Install OpenCode
         run: npm install -g opencode-ai@latest
 
+      - name: Parse target repository
+        id: target-repo
+        shell: bash
+        run: |
+          owner="${REPO%%/*}"
+          repo="${REPO#*/}"
+
+          if [[ -z "$owner" || -z "$repo" || "$owner" == "$repo" ]]; then
+            echo "Expected REPO in owner/name format, got: $REPO" >&2
+            exit 1
+          fi
+
+          echo "owner=$owner" >> "$GITHUB_OUTPUT"
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: ${{ steps.target-repo.outputs.owner }}
+          repositories: ${{ steps.target-repo.outputs.repo }}
+
       - name: Run review
         working-directory: ${{ github.workspace }}
         env:
-          GH_MCP_TOKEN: ${{ secrets.GH_MCP_TOKEN }}
+          GH_MCP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           opencode run "Review $REPO $PR_NUMBER" --agent github-pr-review
