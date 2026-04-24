@@ -5,11 +5,11 @@
   "agent": {
     "bitbucket-pr-review": {
       "mode": "primary",
-      "model": "opencode/big-pickle"
+      "model": "amazon-bedrock/review-model"
     },
     "github-pr-review": {
       "mode": "primary",
-      "model": "opencode/big-pickle"
+      "model": "amazon-bedrock/review-model"
     }
   },
   "instructions": [],
@@ -41,6 +41,15 @@
       "git add *": "deny",
       "git commit *": "deny",
       "git push *": "deny"
+    }
+  },
+  "provider": {
+    "amazon-bedrock": {
+      "models": {
+        "review-model": {
+          "id": "arn:aws:bedrock:us-east-2:145525148011:inference-profile/us.anthropic.claude-sonnet-4-6"
+        }
+      }
     }
   },
   "mcp": {
