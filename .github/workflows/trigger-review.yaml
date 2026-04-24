@@ -26,6 +26,9 @@ jobs:
       PR_NUMBER: ${{ github.event.client_payload.pr_number || inputs.pr_number }}
       ALLOWED_REPO_OWNER: ${{ vars.ALLOWED_REPO_OWNER }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
