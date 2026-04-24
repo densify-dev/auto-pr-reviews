@@ -162,6 +162,7 @@ jobs:
       - name: Run review
         working-directory: ${{ github.workspace }}
         env:
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
           GH_MCP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           opencode run "Review $REPO $PR_NUMBER" --agent github-pr-review
