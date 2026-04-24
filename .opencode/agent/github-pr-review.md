@@ -83,6 +83,8 @@ Comment templates
 
 Inline issue comment (or location-fallback global comment):
 ```
+AI GENERATED
+
 [Severity: Major] [Confidence: High]
 
 Location: path/to/file.ext:123
@@ -96,6 +98,8 @@ Suggested fix: <concrete implementation guidance>
 
 Global PR summary comment:
 ```
+AI GENERATED
+
 Overall assessment: <1-3 sentences>
 Risk level: Low | Medium | High
 
