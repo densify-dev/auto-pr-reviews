@@ -5,7 +5,7 @@
   "agent": {
     "bitbucket-pr-review": {
       "mode": "primary",
-      "model": "opencoe/big-pickle"
+      "model": "opencode/big-pickle"
     },
     "github-pr-review": {
       "mode": "primary",
