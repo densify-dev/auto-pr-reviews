@@ -1,0 +1,119 @@
+name: Request PR Review
+description: Request a central PR review run via repository_dispatch using a GitHub App token.
+
+inputs:
+  app-client-id:
+    description: GitHub App client ID used to mint the dispatch token.
+    required: true
+  app-private-key:
+    description: GitHub App private key used to mint the dispatch token.
+    required: true
+  central-repo:
+    description: Central repository receiving repository_dispatch in owner/name format.
+    required: true
+  provider:
+    description: Pull request provider.
+    required: false
+    default: github
+  repo:
+    description: Repository containing the pull request in owner/name format.
+    required: true
+  pr-number:
+    description: Pull request number to review.
+    required: true
+  event-type:
+    description: repository_dispatch event type.
+    required: false
+    default: pr-review-request
+
+outputs:
+  dispatch-token-installation-id:
+    description: Installation ID used to create the dispatch token.
+    value: ${{ steps.app-token.outputs.installation-id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        CENTRAL_REPO: ${{ inputs.central-repo }}
+        PROVIDER: ${{ inputs.provider }}
+        TARGET_REPO: ${{ inputs.repo }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+      run: |
+        set -euo pipefail
+
+        for repo_value in "$CENTRAL_REPO" "$TARGET_REPO"; do
+          owner="${repo_value%%/*}"
+          repo="${repo_value#*/}"
+
+          if [[ -z "$owner" || -z "$repo" || "$owner" == "$repo" ]]; then
+            echo "Expected repository in owner/name format, got: $repo_value" >&2
+            exit 1
+          fi
+        done
+
+        if [[ "$PROVIDER" != "github" && "$PROVIDER" != "bitbucket" ]]; then
+          echo "Unsupported provider: $PROVIDER" >&2
+          exit 1
+        fi
+
+        if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+          echo "pr-number must be a positive integer, got: $PR_NUMBER" >&2
+          exit 1
+        fi
+
+    - name: Parse central repository
+      id: central-repo
+      shell: bash
+      env:
+        CENTRAL_REPO: ${{ inputs.central-repo }}
+      run: |
+        set -euo pipefail
+        echo "owner=${CENTRAL_REPO%%/*}" >> "$GITHUB_OUTPUT"
+        echo "repo=${CENTRAL_REPO#*/}" >> "$GITHUB_OUTPUT"
+
+    - name: Create GitHub App token
+      id: app-token
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.app-client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ steps.central-repo.outputs.owner }}
+        repositories: ${{ steps.central-repo.outputs.repo }}
+        permission-contents: write
+
+    - name: Send review request
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        GITHUB_API_URL: ${{ github.api_url }}
+        EVENT_TYPE: ${{ inputs.event-type }}
+        PROVIDER: ${{ inputs.provider }}
+        TARGET_REPO: ${{ inputs.repo }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        CENTRAL_OWNER: ${{ steps.central-repo.outputs.owner }}
+        CENTRAL_REPO_NAME: ${{ steps.central-repo.outputs.repo }}
+      run: |
+        set -euo pipefail
+
+        payload=$(cat <<EOF
+        {
+          "event_type": "${EVENT_TYPE}",
+          "client_payload": {
+            "provider": "${PROVIDER}",
+            "repo": "${TARGET_REPO}",
+            "pr_number": "${PR_NUMBER}"
+          }
+        }
+        EOF
+        )
+
+        curl -fsSL \
+          -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "${GITHUB_API_URL}/repos/${CENTRAL_OWNER}/${CENTRAL_REPO_NAME}/dispatches" \
+          -d "${payload}"

@@ -28,6 +28,9 @@ jobs:
   review:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: central-pr-review-${{ github.event.client_payload.provider || inputs.provider }}-${{ github.event.client_payload.repo || inputs.repo }}-${{ github.event.client_payload.pr_number || inputs.pr_number }}
+      cancel-in-progress: true
     env:
       PROVIDER: ${{ github.event.client_payload.provider || inputs.provider }}
       REPO: ${{ github.event.client_payload.repo || inputs.repo }}
