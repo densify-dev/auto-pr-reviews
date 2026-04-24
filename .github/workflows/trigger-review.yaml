@@ -34,4 +34,4 @@ jobs:
 
       - name: Run review
         run: |
-          opencode run "say $REPO $PR_NUMBER" --model opencode/big-pickle
+          opencode run "say $REPO $PR_NUMBER" --agent github-pr-review
