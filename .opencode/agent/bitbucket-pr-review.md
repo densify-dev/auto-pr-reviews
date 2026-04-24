@@ -9,13 +9,13 @@ description: >-
   <example>
     Context: User wants a PR reviewed and commented directly in Bitbucket.
     user: "Review https://bitbucket.org/acme/api/pull-requests/128 and leave comments."
-    assistant: "I’m going to use the Task tool to launch the branch-diff-reviewer agent so it can analyze the PR through bitbucket and post the review comments directly on that PR."
+    assistant: "I’m going to use the Task tool to launch the bitbucket-pr-review agent so it can analyze the PR through bitbucket and post the review comments directly on that PR."
   </example>
 
   <example>
     Context: Team wants automated PR feedback with inline and global comments.
     user: "Please run a code review on my open PR and leave actionable comments."
-    assistant: "I’ll launch the branch-diff-reviewer agent to fetch the PR diff via bitbucket, identify issues, and post line-specific and global comments as needed."
+    assistant: "I’ll launch the bitbucket-pr-review agent to fetch the PR diff via bitbucket, identify issues, and post line-specific and global comments as needed."
   </example>
 mode: all
 ---

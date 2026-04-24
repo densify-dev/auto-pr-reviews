@@ -5,6 +5,13 @@ on:
     types: [pr-review-request]
   workflow_dispatch:
     inputs:
+      provider:
+        description: Pull request provider
+        required: true
+        type: choice
+        options:
+          - github
+          - bitbucket
       repo:
         description: Repository in owner/name format
         required: true
@@ -22,9 +29,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      PROVIDER: ${{ github.event.client_payload.provider || inputs.provider }}
       REPO: ${{ github.event.client_payload.repo || inputs.repo }}
       PR_NUMBER: ${{ github.event.client_payload.pr_number || inputs.pr_number }}
-      ALLOWED_REPO_OWNER: ${{ vars.ALLOWED_REPO_OWNER }}
+      ALLOWED_GITHUB_OWNER: ${{ vars.ALLOWED_GITHUB_OWNER || vars.ALLOWED_REPO_OWNER }}
+      ALLOWED_BITBUCKET_WORKSPACE: ${{ vars.ALLOWED_BITBUCKET_WORKSPACE }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -43,8 +52,13 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -z "${ALLOWED_REPO_OWNER:-}" ]]; then
-            echo "ALLOWED_REPO_OWNER repository variable must be configured" >&2
+          if [[ -z "${PROVIDER:-}" ]]; then
+            echo "PROVIDER must be set to github or bitbucket" >&2
+            exit 1
+          fi
+
+          if [[ "$PROVIDER" != "github" && "$PROVIDER" != "bitbucket" ]]; then
+            echo "Unsupported provider: $PROVIDER" >&2
             exit 1
           fi
 
@@ -61,9 +75,26 @@ jobs:
             exit 1
           fi
 
-          if [[ "$owner" != "$ALLOWED_REPO_OWNER" ]]; then
-            echo "Repository owner $owner is not allowed" >&2
-            exit 1
+          if [[ "$PROVIDER" == "github" ]]; then
+            if [[ -z "${ALLOWED_GITHUB_OWNER:-}" ]]; then
+              echo "ALLOWED_GITHUB_OWNER repository variable must be configured" >&2
+              exit 1
+            fi
+
+            if [[ "$owner" != "$ALLOWED_GITHUB_OWNER" ]]; then
+              echo "GitHub repository owner $owner is not allowed" >&2
+              exit 1
+            fi
+          else
+            if [[ -z "${ALLOWED_BITBUCKET_WORKSPACE:-}" ]]; then
+              echo "ALLOWED_BITBUCKET_WORKSPACE repository variable must be configured" >&2
+              exit 1
+            fi
+
+            if [[ "$owner" != "$ALLOWED_BITBUCKET_WORKSPACE" ]]; then
+              echo "Bitbucket workspace $owner is not allowed" >&2
+              exit 1
+            fi
           fi
 
           if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
@@ -71,11 +102,13 @@ jobs:
             exit 1
           fi
 
+          echo "provider=$PROVIDER" >> "$GITHUB_OUTPUT"
           echo "owner=$owner" >> "$GITHUB_OUTPUT"
           echo "repo=$repo" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub App token
         id: app-token
+        if: steps.target-repo.outputs.provider == 'github'
         shell: bash
         env:
           GH_APP_ID: ${{ vars.GH_APP_ID }}
@@ -183,6 +216,24 @@ jobs:
         env:
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
           GH_MCP_TOKEN: ${{ steps.app-token.outputs.token }}
+          BB_MCP_TOKEN: ${{ secrets.BB_MCP_TOKEN }}
         run: |
           set -euo pipefail
-          opencode run "Review $REPO $PR_NUMBER" --agent github-pr-review
+
+          agent=""
+          review_target=""
+
+          if [[ "$PROVIDER" == "github" ]]; then
+            agent="github-pr-review"
+            review_target="https://github.com/$REPO/pull/$PR_NUMBER"
+          else
+            if [[ -z "${BB_MCP_TOKEN:-}" ]]; then
+              echo "BB_MCP_TOKEN secret must be configured for Bitbucket reviews" >&2
+              exit 1
+            fi
+
+            agent="bitbucket-pr-review"
+            review_target="https://bitbucket.org/$REPO/pull-requests/$PR_NUMBER"
+          fi
+
+          opencode run "Review $review_target" --agent "$agent"
