@@ -40,4 +40,4 @@ jobs:
         env:
           GH_MCP_TOKEN: ${{ secrets.GH_MCP_TOKEN }}
         run: |
-          opencode run "say $REPO $PR_NUMBER" --agent github-pr-review
+          opencode run "Review $REPO $PR_NUMBER" --agent github-pr-review
