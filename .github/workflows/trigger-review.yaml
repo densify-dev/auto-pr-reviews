@@ -13,42 +13,57 @@ on:
         description: Pull request number
         required: true
         type: string
-      installation_id:
-        description: Optional GitHub App installation ID override
-        required: false
-        type: string
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       REPO: ${{ github.event.client_payload.repo || inputs.repo }}
       PR_NUMBER: ${{ github.event.client_payload.pr_number || inputs.pr_number }}
-      GH_APP_INSTALLATION_ID: ${{ github.event.client_payload.installation_id || inputs.installation_id || vars.GH_APP_INSTALLATION_ID }}
+      ALLOWED_REPO_OWNER: ${{ vars.ALLOWED_REPO_OWNER }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 22
 
       - name: Install OpenCode
-        run: npm install -g opencode-ai@latest
+        run: npm install -g opencode-ai@1.14.24
 
-      - name: Parse target repository
+      - name: Validate request
         id: target-repo
         shell: bash
         run: |
+          set -euo pipefail
+
+          if [[ -z "${ALLOWED_REPO_OWNER:-}" ]]; then
+            echo "ALLOWED_REPO_OWNER repository variable must be configured" >&2
+            exit 1
+          fi
+
           owner="${REPO%%/*}"
           repo="${REPO#*/}"
 
           if [[ -z "$owner" || -z "$repo" || "$owner" == "$repo" ]]; then
             echo "Expected REPO in owner/name format, got: $REPO" >&2
+            exit 1
+          fi
+
+          if [[ ! "$owner" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,38}$ || ! "$repo" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Repository contains invalid characters: $REPO" >&2
+            exit 1
+          fi
+
+          if [[ "$owner" != "$ALLOWED_REPO_OWNER" ]]; then
+            echo "Repository owner $owner is not allowed" >&2
+            exit 1
+          fi
+
+          if [[ ! "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PR_NUMBER must be a positive integer, got: $PR_NUMBER" >&2
             exit 1
           fi
 
@@ -64,6 +79,8 @@ jobs:
           TARGET_OWNER: ${{ steps.target-repo.outputs.owner }}
           TARGET_REPO: ${{ steps.target-repo.outputs.repo }}
         run: |
+          set -euo pipefail
+
           if [[ -z "${GH_APP_ID:-}" || -z "${GH_APP_PRIVATE_KEY:-}" ]]; then
             echo "GH_APP_ID variable and GH_APP_PRIVATE_KEY secret must be configured" >&2
             exit 1
@@ -125,22 +142,20 @@ jobs:
           NODE
           )
 
-          installation_id="${GH_APP_INSTALLATION_ID:-}"
-          if [[ -z "$installation_id" ]]; then
-            for path in \
-              "$GITHUB_API_URL/repos/$TARGET_OWNER/$TARGET_REPO/installation" \
-              "$GITHUB_API_URL/orgs/$TARGET_OWNER/installation" \
-              "$GITHUB_API_URL/users/$TARGET_OWNER/installation"
-            do
-              if response=$(make_request GET "$path" "$app_jwt" 2>/dev/null); then
-                installation_id=$(printf '%s' "$response" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(String(JSON.parse(data).id || '')));")
-                break
-              fi
-            done
-          fi
+          installation_id=""
+          for path in \
+            "$GITHUB_API_URL/repos/$TARGET_OWNER/$TARGET_REPO/installation" \
+            "$GITHUB_API_URL/orgs/$TARGET_OWNER/installation" \
+            "$GITHUB_API_URL/users/$TARGET_OWNER/installation"
+          do
+            if response=$(make_request GET "$path" "$app_jwt" 2>/dev/null); then
+              installation_id=$(printf '%s' "$response" | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(String(JSON.parse(data).id || '')));")
+              break
+            fi
+          done
 
           if [[ -z "$installation_id" ]]; then
-            echo "Unable to find a GitHub App installation for $TARGET_OWNER/$TARGET_REPO. Install the app on the owner or provide GH_APP_INSTALLATION_ID/installation_id." >&2
+            echo "Unable to find a GitHub App installation for $TARGET_OWNER/$TARGET_REPO. Install the app on the owner or repository." >&2
             exit 1
           fi
 
@@ -165,4 +180,5 @@ jobs:
           AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
           GH_MCP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          set -euo pipefail
           opencode run "Review $REPO $PR_NUMBER" --agent github-pr-review
