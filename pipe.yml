@@ -1,0 +1,19 @@
+name: Auto PR Reviews Bitbucket Pipe
+image: ghcr.io/densify-dev/auto-pr-reviews-bitbucket-pipe
+description: Dispatch Bitbucket pull requests to the central auto-pr-reviews repository.
+category: Utility
+variables:
+  - name: PR_REVIEW_DISPATCH_APP_CLIENT_ID
+    required: true
+  - name: PR_REVIEW_DISPATCH_APP_PRIVATE_KEY
+    required: true
+  - name: PR_REVIEW_CENTRAL_REPO
+    required: true
+  - name: PR_REVIEW_BITBUCKET_PR_READ_TOKEN
+    required: true
+  - name: PR_REVIEW_EVENT_TYPE
+    default: pr-review-request
+  - name: PR_REVIEW_GITHUB_API_URL
+    default: https://api.github.com
+  - name: DEBUG
+    default: "false"

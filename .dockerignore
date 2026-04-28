@@ -1,0 +1,11 @@
+.git
+.github
+.opencode
+julsemaan-tmp
+test
+README.md
+LICENSE
+action.yml
+node_modules
+npm-debug.log*
+yarn-error.log*
