@@ -1,26 +1,27 @@
 const { isDraftPullRequest } = require('./draft');
+const { retryJson } = require('./http');
 
-async function fetchPullRequest({ repoFullName, prNumber, readToken, fetchImpl = fetch }) {
+async function fetchPullRequest({ repoFullName, prNumber, readToken, fetchImpl = fetch, logger }) {
   const url = `https://api.bitbucket.org/2.0/repositories/${repoFullName}/pullrequests/${prNumber}`;
 
-  let response;
-  try {
-    response = await fetchImpl(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${readToken}`,
-      },
-    });
-  } catch {
-    throw new Error(`Failed because Bitbucket PR lookup failed: ${repoFullName}#${prNumber}`);
-  }
+  const response = await retryJson({
+    attempts: 3,
+    url,
+    method: 'GET',
+    token: readToken,
+    headers: {
+      Accept: 'application/json',
+    },
+    fetchImpl,
+    logger,
+  });
 
   if (!response.ok) {
-    throw new Error(`Failed because Bitbucket PR lookup failed: ${repoFullName}#${prNumber} (HTTP ${response.status})`);
+    const detail = response.status ? ` (HTTP ${response.status})` : '';
+    throw new Error(`Failed because Bitbucket PR lookup failed: ${repoFullName}#${prNumber}${detail}`);
   }
 
-  return response.json();
+  return response.body;
 }
 
 function classifyPullRequest(pr) {

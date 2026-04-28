@@ -27,6 +27,11 @@ async function lookupInstallationId({ githubApiUrl, centralRepo, appJwt, fetchIm
       url,
       method: 'GET',
       token: appJwt,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
       fetchImpl,
       logger,
     });
@@ -45,6 +50,11 @@ async function createInstallationToken({ githubApiUrl, installationId, centralRe
     url: `${githubApiUrl}/app/installations/${installationId}/access_tokens`,
     method: 'POST',
     token: appJwt,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
     fetchImpl,
     logger,
   });
@@ -74,6 +84,11 @@ async function sendDispatch({ githubApiUrl, centralRepo, installationToken, payl
     method: 'POST',
     token: installationToken,
     body: payload,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
     fetchImpl,
     logger,
   });

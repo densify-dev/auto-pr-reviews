@@ -18,6 +18,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
     prNumber: config.bitbucket.prNumber,
     readToken: config.bitbucket.readToken,
     fetchImpl,
+    logger: activeLogger,
   });
 
   const decision = classifyPullRequest(pr);

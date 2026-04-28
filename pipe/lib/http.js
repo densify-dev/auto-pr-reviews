@@ -2,17 +2,15 @@ function isTransientStatus(status) {
   return status === 429 || status >= 500;
 }
 
-async function requestJson({ url, method, token, body, fetchImpl = fetch }) {
+async function requestJson({ url, method, token, body, headers = {}, fetchImpl = fetch }) {
   let response;
 
   try {
     response = await fetchImpl(url, {
       method,
       headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-GitHub-Api-Version': '2022-11-28',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
       },
       body: body ? JSON.stringify(body) : undefined,
     });
@@ -44,11 +42,11 @@ async function requestJson({ url, method, token, body, fetchImpl = fetch }) {
   };
 }
 
-async function retryJson({ attempts, url, method, token, body, fetchImpl, logger, sleep = defaultSleep }) {
+async function retryJson({ attempts, url, method, token, body, headers, fetchImpl, logger, sleep = defaultSleep }) {
   let lastResponse = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const response = await requestJson({ url, method, token, body, fetchImpl });
+    const response = await requestJson({ url, method, token, body, headers, fetchImpl });
     lastResponse = response;
 
     const shouldRetry =

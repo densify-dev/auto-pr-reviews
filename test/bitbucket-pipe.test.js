@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const { classifyPullRequest } = require('../pipe/lib/bitbucket');
+const { classifyPullRequest, fetchPullRequest } = require('../pipe/lib/bitbucket');
 const { parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
 const { isDraftPullRequest } = require('../pipe/lib/draft');
 const { buildDispatchPayload } = require('../pipe/lib/github');
@@ -112,6 +112,34 @@ test('retryJson retries transient failures and eventually succeeds', async () =>
   assert.equal(attempts, 3);
   assert.deepEqual(sleeps, [200, 400]);
   assert.equal(response.status, 204);
+});
+
+test('fetchPullRequest retries transient Bitbucket failures and eventually succeeds', async () => {
+  let attempts = 0;
+  const logs = [];
+
+  const pr = await fetchPullRequest({
+    repoFullName: 'workspace/service',
+    prNumber: 42,
+    readToken: 'bb-token',
+    logger: {
+      debug(message) {
+        logs.push(message);
+      },
+    },
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts < 3) {
+        return createJsonResponse(502, { error: { message: 'bad gateway' } });
+      }
+
+      return createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: false });
+    },
+  });
+
+  assert.equal(attempts, 3);
+  assert.equal(logs.length, 2);
+  assert.deepEqual(pr, { title: 'Feature', state: 'OPEN', draft: false });
 });
 
 test('runPipe dispatches an open non-draft pull request', async () => {
