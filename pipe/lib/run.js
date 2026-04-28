@@ -23,7 +23,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
   const decision = classifyPullRequest(pr);
   if (decision.action === 'skip-draft') {
     activeLogger.info(
-      `Skipped because PR is draft/WIP: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
+      `Skipped because PR is draft: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
     );
     return { outcome: 'skipped-draft' };
   }

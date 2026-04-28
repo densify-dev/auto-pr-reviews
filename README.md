@@ -82,7 +82,7 @@ Consumer contract:
 - Use `BITBUCKET_REPO_FULL_NAME` as the canonical `repo` payload value.
 - Use `BITBUCKET_PR_ID` as the canonical `pr_number` payload value.
 - The pipe reads the Bitbucket PR state before dispatching.
-- The pipe exits `0` for draft, WIP, or non-open pull requests.
+- The pipe exits `0` for draft or non-open pull requests.
 - The pipe dispatches only valid open pull requests to the central repository.
 
 Required Bitbucket variables:

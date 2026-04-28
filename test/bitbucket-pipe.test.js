@@ -59,9 +59,9 @@ test('parsePositiveInteger rejects invalid values', () => {
   assert.throws(() => parsePositiveInteger('0', 'BITBUCKET_PR_ID'), /positive integer/);
 });
 
-test('isDraftPullRequest detects draft field and WIP prefixes', () => {
+test('isDraftPullRequest detects draft field only', () => {
   assert.equal(isDraftPullRequest({ draft: true, title: 'Feature' }), true);
-  assert.equal(isDraftPullRequest({ title: '[WIP] Feature' }), true);
+  assert.equal(isDraftPullRequest({ title: '[WIP] Feature' }), false);
   assert.equal(isDraftPullRequest({ title: 'Feature' }), false);
 });
 
@@ -169,12 +169,12 @@ test('runPipe exits successfully for draft pull requests', async () => {
     },
     fetchImpl: async (url) => {
       assert.match(url, /api\.bitbucket\.org/);
-      return createJsonResponse(200, { title: 'Draft: Feature', state: 'OPEN', draft: false });
+      return createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: true });
     },
   });
 
   assert.equal(result.outcome, 'skipped-draft');
-  assert.match(logs[0], /Skipped because PR is draft\/WIP/);
+  assert.match(logs[0], /Skipped because PR is draft/);
 });
 
 test('runPipe exits successfully for non-open pull requests', async () => {
