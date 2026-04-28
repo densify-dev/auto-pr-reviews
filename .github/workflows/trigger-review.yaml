@@ -13,7 +13,7 @@ on:
           - github
           - bitbucket
       repo:
-        description: Repository in owner/name format
+        description: Repository in owner/name format; Bitbucket requests use workspace/repo
         required: true
         type: string
       pr_number:
