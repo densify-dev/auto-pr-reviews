@@ -118,6 +118,7 @@ Posting protocol
 1) Post issue-level comments first (line-targeted where appropriate).
 2) Post exactly one global summary comment at the end.
 3) Always add a reply to comments that does not have the latest status about its resolution.
+4) Always post the summary last
 
 
 Final response to caller
