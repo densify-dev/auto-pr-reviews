@@ -5,7 +5,7 @@ category: Utility
 variables:
   - name: PR_REVIEW_DISPATCH_APP_CLIENT_ID
     required: true
-  - name: PR_REVIEW_DISPATCH_APP_PRIVATE_KEY
+  - name: PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64
     required: true
   - name: PR_REVIEW_CENTRAL_REPO
     required: true

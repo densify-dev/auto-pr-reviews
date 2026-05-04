@@ -5,12 +5,21 @@ function createAppJwt(appClientId, appPrivateKey, now = Math.floor(Date.now() / 
   const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
   const header = encode({ alg: 'RS256', typ: 'JWT' });
   const payload = encode({ iat: now - 60, exp: now + 540, iss: appClientId });
+  let signingKey;
+
+  try {
+    signingKey = crypto.createPrivateKey({ key: appPrivateKey, format: 'pem' });
+  } catch {
+    throw new Error(
+      'Failed because PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 did not decode to a valid GitHub App private key PEM.',
+    );
+  }
 
   const signer = crypto.createSign('RSA-SHA256');
   signer.update(`${header}.${payload}`);
   signer.end();
 
-  const signature = signer.sign(appPrivateKey).toString('base64url');
+  const signature = signer.sign(signingKey).toString('base64url');
   return `${header}.${payload}.${signature}`;
 }
 

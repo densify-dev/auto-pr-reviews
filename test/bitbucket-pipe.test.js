@@ -3,18 +3,19 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
 const { classifyPullRequest, fetchPullRequest } = require('../pipe/lib/bitbucket');
-const { parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
+const { normalizePrivateKey, parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
 const { isDraftPullRequest } = require('../pipe/lib/draft');
-const { buildDispatchPayload } = require('../pipe/lib/github');
+const { buildDispatchPayload, createAppJwt } = require('../pipe/lib/github');
 const { retryJson } = require('../pipe/lib/http');
 const { runPipe } = require('../pipe/lib/run');
 
 function createEnv(overrides = {}) {
   const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
 
   return {
     PR_REVIEW_DISPATCH_APP_CLIENT_ID: '12345',
-    PR_REVIEW_DISPATCH_APP_PRIVATE_KEY: privateKey.export({ type: 'pkcs1', format: 'pem' }).toString(),
+    PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64: Buffer.from(pem).toString('base64'),
     PR_REVIEW_CENTRAL_REPO: 'example/auto-pr-reviews',
     PR_REVIEW_BITBUCKET_PR_READ_TOKEN: 'bb-token',
     PR_REVIEW_EVENT_TYPE: 'pr-review-request',
@@ -57,6 +58,30 @@ test('parsePositiveInteger accepts positive integers', () => {
 
 test('parsePositiveInteger rejects invalid values', () => {
   assert.throws(() => parsePositiveInteger('0', 'BITBUCKET_PR_ID'), /positive integer/);
+});
+
+test('normalizePrivateKey decodes base64 encoded PEM values', () => {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString().trim();
+
+  assert.equal(normalizePrivateKey(Buffer.from(pem).toString('base64')), pem);
+});
+
+test('normalizePrivateKey rejects non-base64 private key values', () => {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+
+  assert.throws(
+    () => normalizePrivateKey(pem),
+    /PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 must be a base64-encoded GitHub App private key PEM/,
+  );
+});
+
+test('createAppJwt throws a clear error for invalid private keys', () => {
+  assert.throws(
+    () => createAppJwt('12345', 'not-a-private-key'),
+    /PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 did not decode to a valid GitHub App private key PEM/,
+  );
 });
 
 test('isDraftPullRequest detects draft field only', () => {

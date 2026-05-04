@@ -1,6 +1,6 @@
 const REQUIRED_ENV_VARS = [
   'PR_REVIEW_DISPATCH_APP_CLIENT_ID',
-  'PR_REVIEW_DISPATCH_APP_PRIVATE_KEY',
+  'PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64',
   'PR_REVIEW_CENTRAL_REPO',
   'PR_REVIEW_BITBUCKET_PR_READ_TOKEN',
   'BITBUCKET_REPO_FULL_NAME',
@@ -33,7 +33,22 @@ function parsePositiveInteger(value, envName) {
 }
 
 function normalizePrivateKey(privateKey) {
-  return privateKey.replace(/\\n/g, '\n');
+  const normalized = privateKey.trim();
+
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(normalized)) {
+    throw new Error(
+      'Failed because PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 must be a base64-encoded GitHub App private key PEM.',
+    );
+  }
+
+  const decoded = Buffer.from(normalized, 'base64').toString('utf8').trim().replace(/\r\n?/g, '\n');
+  if (!decoded.includes('BEGIN ') || !decoded.includes('PRIVATE KEY')) {
+    throw new Error(
+      'Failed because PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 must be a base64-encoded GitHub App private key PEM.',
+    );
+  }
+
+  return decoded;
 }
 
 function readConfig(env = process.env) {
@@ -41,7 +56,7 @@ function readConfig(env = process.env) {
 
   return {
     appClientId: env.PR_REVIEW_DISPATCH_APP_CLIENT_ID,
-    appPrivateKey: normalizePrivateKey(env.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY),
+    appPrivateKey: normalizePrivateKey(env.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64),
     bitbucket: {
       repo: parseRepo(env.BITBUCKET_REPO_FULL_NAME, 'BITBUCKET_REPO_FULL_NAME'),
       prNumber: parsePositiveInteger(env.BITBUCKET_PR_ID, 'BITBUCKET_PR_ID'),
@@ -55,6 +70,7 @@ function readConfig(env = process.env) {
 }
 
 module.exports = {
+  normalizePrivateKey,
   parsePositiveInteger,
   parseRepo,
   readConfig,

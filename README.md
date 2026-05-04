@@ -10,7 +10,7 @@ Consuming repositories can request a review by using the root action from this r
 - uses: your-org/auto-pr-reviews@v1
   with:
     app-client-id: ${{ vars.PR_REVIEW_DISPATCH_APP_CLIENT_ID }}
-    app-private-key: ${{ secrets.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY }}
+    app-private-key: ${{ secrets.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 }}
     central-repo: your-org/auto-pr-reviews
     provider: github
     repo: ${{ github.repository }}
@@ -29,7 +29,7 @@ Create a dedicated dispatch app and install it on this repository.
 Expose the app credentials to consuming repositories:
 
 - Org variable: `PR_REVIEW_DISPATCH_APP_CLIENT_ID`
-- Org secret: `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY`
+- Org secret: `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64`
 
 The dispatch app is intentionally separate from the review app used by the central workflow so consuming repositories do not receive broader review credentials.
 
@@ -55,7 +55,7 @@ jobs:
       - uses: your-org/auto-pr-reviews@v1
         with:
           app-client-id: ${{ vars.PR_REVIEW_DISPATCH_APP_CLIENT_ID }}
-          app-private-key: ${{ secrets.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY }}
+          app-private-key: ${{ secrets.PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 }}
           central-repo: your-org/auto-pr-reviews
           provider: github
           repo: ${{ github.repository }}
@@ -88,7 +88,7 @@ Consumer contract:
 Required Bitbucket variables:
 
 - Repository or workspace variable: `PR_REVIEW_DISPATCH_APP_CLIENT_ID`
-- Secured repository or workspace variable: `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY`
+- Secured repository or workspace variable: `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` as base64-encoded PEM
 - Repository or workspace variable: `PR_REVIEW_CENTRAL_REPO`
 - Secured repository or workspace variable: `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`
 
@@ -114,14 +114,16 @@ pipelines:
             - pipe: docker://ghcr.io/densify-dev/auto-pr-reviews-bitbucket-pipe:1.0.0
               variables:
                 PR_REVIEW_DISPATCH_APP_CLIENT_ID: $PR_REVIEW_DISPATCH_APP_CLIENT_ID
-                PR_REVIEW_DISPATCH_APP_PRIVATE_KEY: $PR_REVIEW_DISPATCH_APP_PRIVATE_KEY
+                PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64: $PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64
                 PR_REVIEW_CENTRAL_REPO: $PR_REVIEW_CENTRAL_REPO
                 PR_REVIEW_BITBUCKET_PR_READ_TOKEN: $PR_REVIEW_BITBUCKET_PR_READ_TOKEN
 ```
 
 Notes:
 
-- `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY` and `PR_REVIEW_BITBUCKET_PR_READ_TOKEN` should be secured Bitbucket variables.
+- `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` and `PR_REVIEW_BITBUCKET_PR_READ_TOKEN` should be secured Bitbucket variables.
+- `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` must be the base64-encoded GitHub App private key PEM, not a file path and not raw PEM text.
+- You can generate the stored value with `base64 -w 0 private-key.pem`.
 - `PR_REVIEW_CENTRAL_REPO` must point at this repository in `owner/name` format.
 - The pipe performs the PR state check and dispatch retry handling before the central workflow runs.
 - Pin to a full semver tag such as `1.0.0` for stable rollouts. Convenience tags such as `1` and `1.0` may also be published for upgrades within a release line.
