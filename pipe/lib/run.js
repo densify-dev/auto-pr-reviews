@@ -5,9 +5,10 @@ const { createLogger } = require('./log');
 
 async function runOpencode({ repo, prNumber, mcpToken, logger }) {
   return new Promise((resolve, reject) => {
+    const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
     const child = execFile(
       'opencode',
-      ['run', '--agent', 'bitbucket-pr-review', '--repo', repo, '--pr-number', String(prNumber)],
+      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
       {
         env: { ...process.env, BB_MCP_TOKEN: mcpToken },
       },
@@ -37,7 +38,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
   const pr = await fetchPullRequest({
     repoFullName: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
-    readToken: config.bitbucket.mcpToken,
+    readToken: config.bitbucket.readToken,
     fetchImpl,
     logger: activeLogger,
   });
@@ -60,7 +61,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
   await execImpl({
     repo: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
-    mcpToken: config.bitbucket.mcpToken,
+    mcpToken: config.opencode.mcpToken,
     logger: activeLogger,
   });
 

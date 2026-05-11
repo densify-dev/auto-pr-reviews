@@ -5,5 +5,7 @@ category: Utility
 variables:
   - name: BB_MCP_TOKEN
     required: true
+  - name: PR_REVIEW_BITBUCKET_PR_READ_TOKEN
+    required: true
   - name: DEBUG
     default: "false"

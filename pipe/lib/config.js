@@ -1,5 +1,6 @@
 const REQUIRED_ENV_VARS = [
   'BB_MCP_TOKEN',
+  'PR_REVIEW_BITBUCKET_PR_READ_TOKEN',
   'BITBUCKET_REPO_FULL_NAME',
   'BITBUCKET_PR_ID',
 ];
@@ -36,6 +37,9 @@ function readConfig(env = process.env) {
     bitbucket: {
       repo: parseRepo(env.BITBUCKET_REPO_FULL_NAME, 'BITBUCKET_REPO_FULL_NAME'),
       prNumber: parsePositiveInteger(env.BITBUCKET_PR_ID, 'BITBUCKET_PR_ID'),
+      readToken: env.PR_REVIEW_BITBUCKET_PR_READ_TOKEN,
+    },
+    opencode: {
       mcpToken: env.BB_MCP_TOKEN,
     },
     debug: String(env.DEBUG || 'false').toLowerCase() === 'true',

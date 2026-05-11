@@ -10,6 +10,7 @@ const { runPipe } = require('../pipe/lib/run');
 function createEnv(overrides = {}) {
   return {
     BB_MCP_TOKEN: 'bb-mcp-token',
+    PR_REVIEW_BITBUCKET_PR_READ_TOKEN: 'bb-read-token',
     BITBUCKET_REPO_FULL_NAME: 'workspace/service',
     BITBUCKET_PR_ID: '42',
     DEBUG: 'false',
@@ -188,14 +189,14 @@ test('runPipe exits successfully for non-open pull requests', async () => {
   assert.match(logs[0], /Skipped because PR is not open/);
 });
 
-test('runPipe fails clearly on missing BB_MCP_TOKEN', async () => {
+test('runPipe fails clearly on missing PR_REVIEW_BITBUCKET_PR_READ_TOKEN', async () => {
   await assert.rejects(
     () =>
       runPipe({
-        env: createEnv({ BB_MCP_TOKEN: undefined }),
+        env: createEnv({ PR_REVIEW_BITBUCKET_PR_READ_TOKEN: undefined }),
         fetchImpl: async () => createJsonResponse(200, {}),
       }),
-    /required variable is missing: BB_MCP_TOKEN/,
+    /required variable is missing: PR_REVIEW_BITBUCKET_PR_READ_TOKEN/,
   );
 });
 

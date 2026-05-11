@@ -86,6 +86,7 @@ The pipe:
 Required Bitbucket variables:
 
 - Secured repository or workspace variable: `BB_MCP_TOKEN`
+- Secured repository or workspace variable: `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`
 
 Optional Bitbucket variables:
 
@@ -105,9 +106,10 @@ pipelines:
             - pipe: docker://ghcr.io/densify-dev/auto-pr-reviews-bitbucket-pipe:1.0.0
               variables:
                 BB_MCP_TOKEN: $BB_MCP_TOKEN
+                PR_REVIEW_BITBUCKET_PR_READ_TOKEN: $PR_REVIEW_BITBUCKET_PR_READ_TOKEN
 ```
 
 Notes:
 
-- `BB_MCP_TOKEN` must be a secured Bitbucket variable.
+- `BB_MCP_TOKEN` and `PR_REVIEW_BITBUCKET_PR_READ_TOKEN` must be secured Bitbucket variables.
 - Pin to a full semver tag such as `1.0.0` for stable rollouts. Convenience tags such as `1` and `1.0` may also be published for upgrades within a release line.
