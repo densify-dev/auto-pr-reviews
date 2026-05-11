@@ -8,7 +8,7 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
     const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
     const child = execFile(
       'opencode',
-      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
+      ['run', `--no-input`, `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
       {
         env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
       },
@@ -17,16 +17,35 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
           reject(new Error(`opencode exited with code ${error.code}: ${stderr || error.message}`));
           return;
         }
+        logger.info(`opencode completed`);
         resolve(stdout);
       },
     );
 
+    child.on('spawn', () => {
+      logger.info(`opencode process started: Review ${reviewTarget}`);
+    });
+
     child.stdout.on('data', (chunk) => {
-      logger.info(chunk.toString().trim());
+      const line = chunk.toString();
+      if (line.trim()) {
+        logger.info(line.trim());
+      }
     });
 
     child.stderr.on('data', (chunk) => {
-      logger.debug(chunk.toString().trim());
+      const line = chunk.toString();
+      if (line.trim()) {
+        logger.debug(line.trim());
+      }
+    });
+
+    child.on('error', (error) => {
+      logger.info(`opencode error: ${error.message}`);
+    });
+
+    child.on('exit', (code) => {
+      logger.info(`opencode exited with code ${code}`);
     });
   });
 }
@@ -35,6 +54,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
   const config = readConfig(env);
   const activeLogger = logger || createLogger({ debug: config.debug });
 
+  activeLogger.info(`Fetching PR: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);
   const pr = await fetchPullRequest({
     repoFullName: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
@@ -57,6 +77,8 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
     );
     return { outcome: 'skipped-not-open' };
   }
+
+  activeLogger.info(`Starting review for ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);
 
   await execImpl({
     repo: config.bitbucket.repo.fullName,

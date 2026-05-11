@@ -164,7 +164,7 @@ test('runPipe exits successfully for draft pull requests', async () => {
   });
 
   assert.equal(result.outcome, 'skipped-draft');
-  assert.match(logs[0], /Skipped because PR is draft/);
+  assert.match(logs.find(l => l.includes('Skipped because PR is draft')), /Skipped because PR is draft/);
 });
 
 test('runPipe exits successfully for non-open pull requests', async () => {
@@ -186,7 +186,7 @@ test('runPipe exits successfully for non-open pull requests', async () => {
   });
 
   assert.equal(result.outcome, 'skipped-not-open');
-  assert.match(logs[0], /Skipped because PR is not open/);
+  assert.match(logs.find(l => l.includes('Skipped because PR is not open')), /Skipped because PR is not open/);
 });
 
 test('runPipe fails clearly on missing PR_REVIEW_BITBUCKET_PR_READ_TOKEN', async () => {
