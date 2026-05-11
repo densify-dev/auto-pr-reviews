@@ -10,7 +10,7 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
       'opencode',
       ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
       {
-        env: { ...process.env, BB_MCP_TOKEN: mcpToken },
+        env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
       },
       (error, stdout, stderr) => {
         if (error) {

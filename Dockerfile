@@ -5,6 +5,7 @@ WORKDIR /app
 COPY pipe ./pipe
 COPY pipe.yml ./pipe.yml
 
-RUN npm install -g opencode-ai@1.14.24
+RUN apk add --no-cache curl bash && \
+    curl -fsSL https://opencode.ai/install | bash
 
 ENTRYPOINT ["node", "/app/pipe/index.js"]
