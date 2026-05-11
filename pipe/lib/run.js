@@ -8,7 +8,7 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
     const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
     const child = execFile(
       'opencode',
-      ['run', `"Review ${reviewTarget}"`, '--agent', 'bitbucket-pr-review', '--no-input'],
+      ['run', `"Review ${reviewTarget}"`, '--agent', 'bitbucket-pr-review'],
       {
         env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
       },
