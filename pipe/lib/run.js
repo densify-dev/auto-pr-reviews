@@ -1,22 +1,43 @@
+const { execFile } = require('child_process');
 const { fetchPullRequest, classifyPullRequest } = require('./bitbucket');
 const { readConfig } = require('./config');
-const {
-  createAppJwt,
-  lookupInstallationId,
-  createInstallationToken,
-  buildDispatchPayload,
-  sendDispatch,
-} = require('./github');
 const { createLogger } = require('./log');
 
-async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
+async function runOpencode({ repo, prNumber, mcpToken, logger }) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      'opencode',
+      ['run', '--agent', 'bitbucket-pr-review', '--repo', repo, '--pr-number', String(prNumber)],
+      {
+        env: { ...process.env, BB_MCP_TOKEN: mcpToken },
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(`opencode exited with code ${error.code}: ${stderr || error.message}`));
+          return;
+        }
+        resolve(stdout);
+      },
+    );
+
+    child.stdout.on('data', (chunk) => {
+      logger.info(chunk.toString().trim());
+    });
+
+    child.stderr.on('data', (chunk) => {
+      logger.debug(chunk.toString().trim());
+    });
+  });
+}
+
+async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl = runOpencode } = {}) {
   const config = readConfig(env);
   const activeLogger = logger || createLogger({ debug: config.debug });
 
   const pr = await fetchPullRequest({
     repoFullName: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
-    readToken: config.bitbucket.readToken,
+    readToken: config.bitbucket.mcpToken,
     fetchImpl,
     logger: activeLogger,
   });
@@ -36,44 +57,18 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
     return { outcome: 'skipped-not-open' };
   }
 
-  const appJwt = createAppJwt(config.appClientId, config.appPrivateKey);
-  const installationId = await lookupInstallationId({
-    githubApiUrl: config.githubApiUrl,
-    centralRepo: config.centralRepo,
-    appJwt,
-    fetchImpl,
-    logger: activeLogger,
-  });
-
-  const installationToken = await createInstallationToken({
-    githubApiUrl: config.githubApiUrl,
-    installationId,
-    centralRepo: config.centralRepo,
-    appJwt,
-    fetchImpl,
-    logger: activeLogger,
-  });
-
-  const payload = buildDispatchPayload({
-    eventType: config.eventType,
-    bitbucketRepo: config.bitbucket.repo.fullName,
+  await execImpl({
+    repo: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
-  });
-
-  await sendDispatch({
-    githubApiUrl: config.githubApiUrl,
-    centralRepo: config.centralRepo,
-    installationToken,
-    payload,
-    fetchImpl,
+    mcpToken: config.bitbucket.mcpToken,
     logger: activeLogger,
   });
 
   activeLogger.info(
-    `Dispatched successfully: repo=${config.bitbucket.repo.fullName} pr=${config.bitbucket.prNumber}`,
+    `Review completed: repo=${config.bitbucket.repo.fullName} pr=${config.bitbucket.prNumber}`,
   );
 
-  return { outcome: 'dispatched', payload };
+  return { outcome: 'reviewed' };
 }
 
 module.exports = {

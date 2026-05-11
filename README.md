@@ -76,29 +76,20 @@ It:
 
 Bitbucket repositories use the published Bitbucket pipe instead of the reusable GitHub Action.
 
-Consumer contract:
+The pipe:
 
-- Run only in pull request pipelines.
-- Use `BITBUCKET_REPO_FULL_NAME` as the canonical `repo` payload value.
-- Use `BITBUCKET_PR_ID` as the canonical `pr_number` payload value.
-- The pipe reads the Bitbucket PR state before dispatching.
-- The pipe exits `0` for draft or non-open pull requests.
-- The pipe dispatches only valid open pull requests to the central repository.
+- Reads the Bitbucket PR state
+- Runs `opencode` directly to perform the review
+- Exits `0` for draft or non-open pull requests
+- Exits non-zero if the review fails
 
 Required Bitbucket variables:
 
-- Repository or workspace variable: `PR_REVIEW_DISPATCH_APP_CLIENT_ID`
-- Secured repository or workspace variable: `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` as base64-encoded PEM
-- Repository or workspace variable: `PR_REVIEW_CENTRAL_REPO`
-- Secured repository or workspace variable: `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`
+- Secured repository or workspace variable: `BB_MCP_TOKEN`
 
 Optional Bitbucket variables:
 
-- Repository or workspace variable: `PR_REVIEW_EVENT_TYPE` with default `pr-review-request`
-- Repository or workspace variable: `PR_REVIEW_GITHUB_API_URL` with default `https://api.github.com`
 - Repository or workspace variable: `DEBUG` with default `false`
-
-The central repository must also set `ALLOWED_BITBUCKET_WORKSPACE` and `BB_MCP_TOKEN` so incoming Bitbucket requests are accepted and reviewed.
 
 ## Bitbucket Pipeline Example
 
@@ -109,21 +100,14 @@ pipelines:
   pull-requests:
     '**':
       - step:
-          name: Request central PR review
+          name: Request PR review
           script:
             - pipe: docker://ghcr.io/densify-dev/auto-pr-reviews-bitbucket-pipe:1.0.0
               variables:
-                PR_REVIEW_DISPATCH_APP_CLIENT_ID: $PR_REVIEW_DISPATCH_APP_CLIENT_ID
-                PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64: $PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64
-                PR_REVIEW_CENTRAL_REPO: $PR_REVIEW_CENTRAL_REPO
-                PR_REVIEW_BITBUCKET_PR_READ_TOKEN: $PR_REVIEW_BITBUCKET_PR_READ_TOKEN
+                BB_MCP_TOKEN: $BB_MCP_TOKEN
 ```
 
 Notes:
 
-- `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` and `PR_REVIEW_BITBUCKET_PR_READ_TOKEN` should be secured Bitbucket variables.
-- `PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64` must be the base64-encoded GitHub App private key PEM, not a file path and not raw PEM text.
-- You can generate the stored value with `base64 -w 0 private-key.pem`.
-- `PR_REVIEW_CENTRAL_REPO` must point at this repository in `owner/name` format.
-- The pipe performs the PR state check and dispatch retry handling before the central workflow runs.
+- `BB_MCP_TOKEN` must be a secured Bitbucket variable.
 - Pin to a full semver tag such as `1.0.0` for stable rollouts. Convenience tags such as `1` and `1.0` may also be published for upgrades within a release line.

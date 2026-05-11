@@ -1,25 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
 
 const { classifyPullRequest, fetchPullRequest } = require('../pipe/lib/bitbucket');
-const { normalizePrivateKey, parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
+const { parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
 const { isDraftPullRequest } = require('../pipe/lib/draft');
-const { buildDispatchPayload, createAppJwt } = require('../pipe/lib/github');
 const { retryJson } = require('../pipe/lib/http');
 const { runPipe } = require('../pipe/lib/run');
 
 function createEnv(overrides = {}) {
-  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
-
   return {
-    PR_REVIEW_DISPATCH_APP_CLIENT_ID: '12345',
-    PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64: Buffer.from(pem).toString('base64'),
-    PR_REVIEW_CENTRAL_REPO: 'example/auto-pr-reviews',
-    PR_REVIEW_BITBUCKET_PR_READ_TOKEN: 'bb-token',
-    PR_REVIEW_EVENT_TYPE: 'pr-review-request',
-    PR_REVIEW_GITHUB_API_URL: 'https://api.github.com',
+    BB_MCP_TOKEN: 'bb-mcp-token',
     BITBUCKET_REPO_FULL_NAME: 'workspace/service',
     BITBUCKET_PR_ID: '42',
     DEBUG: 'false',
@@ -60,30 +50,6 @@ test('parsePositiveInteger rejects invalid values', () => {
   assert.throws(() => parsePositiveInteger('0', 'BITBUCKET_PR_ID'), /positive integer/);
 });
 
-test('normalizePrivateKey decodes base64 encoded PEM values', () => {
-  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString().trim();
-
-  assert.equal(normalizePrivateKey(Buffer.from(pem).toString('base64')), pem);
-});
-
-test('normalizePrivateKey rejects non-base64 private key values', () => {
-  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-  const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
-
-  assert.throws(
-    () => normalizePrivateKey(pem),
-    /PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 must be a base64-encoded GitHub App private key PEM/,
-  );
-});
-
-test('createAppJwt throws a clear error for invalid private keys', () => {
-  assert.throws(
-    () => createAppJwt('12345', 'not-a-private-key'),
-    /PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64 did not decode to a valid GitHub App private key PEM/,
-  );
-});
-
 test('isDraftPullRequest detects draft field only', () => {
   assert.equal(isDraftPullRequest({ draft: true, title: 'Feature' }), true);
   assert.equal(isDraftPullRequest({ title: '[WIP] Feature' }), false);
@@ -95,20 +61,6 @@ test('classifyPullRequest skips non-open pull requests', () => {
     action: 'skip-closed',
     state: 'DECLINED',
   });
-});
-
-test('buildDispatchPayload preserves the central payload contract', () => {
-  assert.deepEqual(
-    buildDispatchPayload({ eventType: 'pr-review-request', bitbucketRepo: 'workspace/service', prNumber: 42 }),
-    {
-      event_type: 'pr-review-request',
-      client_payload: {
-        provider: 'bitbucket',
-        repo: 'workspace/service',
-        pr_number: '42',
-      },
-    },
-  );
 });
 
 test('retryJson retries transient failures and eventually succeeds', async () => {
@@ -167,8 +119,7 @@ test('fetchPullRequest retries transient Bitbucket failures and eventually succe
   assert.deepEqual(pr, { title: 'Feature', state: 'OPEN', draft: false });
 });
 
-test('runPipe dispatches an open non-draft pull request', async () => {
-  const calls = [];
+test('runPipe runs opencode for an open non-draft pull request', async () => {
   const logs = [];
   const env = createEnv();
 
@@ -180,32 +131,17 @@ test('runPipe dispatches an open non-draft pull request', async () => {
       },
       debug() {},
     },
-    fetchImpl: async (url, options) => {
-      calls.push({ url, options });
-
-      if (url.includes('api.bitbucket.org')) {
-        return createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: false });
-      }
-
-      if (url.endsWith('/repos/example/auto-pr-reviews/installation')) {
-        return createJsonResponse(200, { id: 99 });
-      }
-
-      if (url.endsWith('/app/installations/99/access_tokens')) {
-        return createJsonResponse(201, { token: 'installation-token' });
-      }
-
-      if (url.endsWith('/repos/example/auto-pr-reviews/dispatches')) {
-        return createJsonResponse(204);
-      }
-
-      throw new Error(`Unexpected URL: ${url}`);
+    fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: false }),
+    execImpl: async ({ repo, prNumber, mcpToken, logger }) => {
+      assert.equal(repo, 'workspace/service');
+      assert.equal(prNumber, 42);
+      assert.equal(mcpToken, 'bb-mcp-token');
+      logger.info('opencode output');
     },
   });
 
-  assert.equal(result.outcome, 'dispatched');
-  assert.equal(calls.length, 4);
-  assert.match(logs.at(-1), /Dispatched successfully/);
+  assert.equal(result.outcome, 'reviewed');
+  assert.match(logs.at(-1), /Review completed/);
 });
 
 test('runPipe exits successfully for draft pull requests', async () => {
@@ -220,9 +156,9 @@ test('runPipe exits successfully for draft pull requests', async () => {
       },
       debug() {},
     },
-    fetchImpl: async (url) => {
-      assert.match(url, /api\.bitbucket\.org/);
-      return createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: true });
+    fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: true }),
+    execImpl: async () => {
+      throw new Error('opencode should not be called');
     },
   });
 
@@ -243,13 +179,27 @@ test('runPipe exits successfully for non-open pull requests', async () => {
       debug() {},
     },
     fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'MERGED', draft: false }),
+    execImpl: async () => {
+      throw new Error('opencode should not be called');
+    },
   });
 
   assert.equal(result.outcome, 'skipped-not-open');
   assert.match(logs[0], /Skipped because PR is not open/);
 });
 
-test('runPipe fails clearly on malformed input', async () => {
+test('runPipe fails clearly on missing BB_MCP_TOKEN', async () => {
+  await assert.rejects(
+    () =>
+      runPipe({
+        env: createEnv({ BB_MCP_TOKEN: undefined }),
+        fetchImpl: async () => createJsonResponse(200, {}),
+      }),
+    /required variable is missing: BB_MCP_TOKEN/,
+  );
+});
+
+test('runPipe fails clearly on malformed BITBUCKET_PR_ID', async () => {
   await assert.rejects(
     () => runPipe({ env: createEnv({ BITBUCKET_PR_ID: 'abc' }), fetchImpl: async () => createJsonResponse(200, {}) }),
     /BITBUCKET_PR_ID must be a positive integer/,
