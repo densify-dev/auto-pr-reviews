@@ -36,7 +36,7 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
     child.stderr.on('data', (chunk) => {
       const line = chunk.toString();
       if (line.trim()) {
-        logger.debug(line.trim());
+        logger.info(line.trim());
       }
     });
 
