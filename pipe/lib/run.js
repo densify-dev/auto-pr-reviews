@@ -8,13 +8,15 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
     const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
     const child = execFile(
       'opencode',
-      ['run', `"Review ${reviewTarget}"`, '--agent', 'bitbucket-pr-review'],
+      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
       {
         env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
+        timeout: 600000,
       },
       (error, stdout, stderr) => {
         if (error) {
-          reject(new Error(`opencode exited with code ${error.code}: ${stderr || error.message}`));
+          const reason = error.killed ? 'timed out' : `exited with code ${error.code}`;
+          reject(new Error(`opencode ${reason}: ${stderr || error.message}`));
           return;
         }
         logger.info(`opencode completed`);
