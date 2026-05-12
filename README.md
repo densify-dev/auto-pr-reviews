@@ -87,10 +87,12 @@ Required Bitbucket variables:
 
 - Secured repository or workspace variable: `BB_MCP_TOKEN`
 - Secured repository or workspace variable: `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`
+- Secured repository or workspace variable: `AWS_BEARER_TOKEN_BEDROCK` — token for Amazon Bedrock to run Claude Sonnet 4.6
 
 Optional Bitbucket variables:
 
 - Repository or workspace variable: `DEBUG` with default `false`
+- Repository or workspace variable: `OPencode_TIMEOUT` — timeout in seconds for the review process (default: `600`)
 
 ## Bitbucket Pipeline Example
 
@@ -107,9 +109,10 @@ pipelines:
               variables:
                 BB_MCP_TOKEN: $BB_MCP_TOKEN
                 PR_REVIEW_BITBUCKET_PR_READ_TOKEN: $PR_REVIEW_BITBUCKET_PR_READ_TOKEN
+                AWS_BEARER_TOKEN_BEDROCK: $AWS_BEARER_TOKEN_BEDROCK
 ```
 
 Notes:
 
-- `BB_MCP_TOKEN` and `PR_REVIEW_BITBUCKET_PR_READ_TOKEN` must be secured Bitbucket variables.
+- `BB_MCP_TOKEN`, `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`, and `AWS_BEARER_TOKEN_BEDROCK` must be secured Bitbucket variables.
 - Pin to a full semver tag such as `1.0.0` for stable rollouts. Convenience tags such as `1` and `1.0` may also be published for upgrades within a release line.
