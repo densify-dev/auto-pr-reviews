@@ -9,3 +9,7 @@ variables:
     required: true
   - name: DEBUG
     default: "false"
+  - name: OPENCODE_TIMEOUT
+    description: "Timeout in seconds for the opencode review process (default: 600)"
+
+

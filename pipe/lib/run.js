@@ -3,15 +3,42 @@ const { fetchPullRequest, classifyPullRequest } = require('./bitbucket');
 const { readConfig } = require('./config');
 const { createLogger } = require('./log');
 
-async function runOpencode({ repo, prNumber, mcpToken, logger }) {
+function logOpencodeEnv(env, logger) {
+  const opencodeVars = ['BB_MCP_TOKEN', 'AWS_BEARER_TOKEN_BEDROCK', 'GH_MCP_TOKEN'];
+  for (const name of opencodeVars) {
+    if (env[name]) {
+      logger.info(`${name}=<set (${env[name].length} chars)>`);
+    } else {
+      logger.info(`${name}=<NOT SET>`);
+    }
+  }
+}
+
+function getTimeout(env) {
+  if (env.OPENCODE_TIMEOUT) {
+    const parsed = Number.parseInt(env.OPENCODE_TIMEOUT, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed * 1000;
+    }
+  }
+  return 600000;
+}
+
+async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
   return new Promise((resolve, reject) => {
     const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
+    const timeout = getTimeout(env);
+    const timeoutMinutes = Math.round(timeout / 60000);
+
+    logger.info(`opencode timeout: ${timeoutMinutes} minute(s)`);
+    logOpencodeEnv(env, logger);
+
     const child = execFile(
       'opencode',
-      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review'],
+      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review', '--print-logs', '--log-level', 'DEBUG'],
       {
         env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
-        timeout: 600000,
+        timeout,
       },
       (error, stdout, stderr) => {
         if (error) {
@@ -23,6 +50,15 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
         resolve(stdout);
       },
     );
+
+    const heartbeatMs = 60000;
+    const heartbeat = setInterval(() => {
+      logger.info(`[heartbeat] opencode still running (pid=${child.pid})...`);
+    }, heartbeatMs);
+
+    const clearHeartbeat = () => {
+      clearInterval(heartbeat);
+    };
 
     child.on('spawn', () => {
       logger.info(`opencode process started: Review ${reviewTarget}`);
@@ -47,6 +83,7 @@ async function runOpencode({ repo, prNumber, mcpToken, logger }) {
     });
 
     child.on('exit', (code) => {
+      clearHeartbeat();
       logger.info(`opencode exited with code ${code}`);
     });
   });
@@ -87,6 +124,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
     prNumber: config.bitbucket.prNumber,
     mcpToken: config.opencode.mcpToken,
     logger: activeLogger,
+    env,
   });
 
   activeLogger.info(
