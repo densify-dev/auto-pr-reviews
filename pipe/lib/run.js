@@ -60,9 +60,28 @@ async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
 
     const child = execFile(
       'opencode',
-      ['run', `Review ${reviewTarget}`, '--agent', 'bitbucket-pr-review', '--print-logs', '--log-level', 'DEBUG'],
+      [
+        'run',
+        `Review ${reviewTarget}`,
+        '--agent',
+        'bitbucket-pr-review',
+        '--format',
+        'json',
+        '--dangerously-skip-permissions',
+        '--print-logs',
+        '--log-level',
+        'DEBUG',
+      ],
       {
-        env: { ...process.env, BB_MCP_TOKEN: mcpToken, PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}` },
+        env: {
+          ...process.env,
+          BB_MCP_TOKEN: mcpToken,
+          OPENCODE_DISABLE_AUTOUPDATE: 'true',
+          OPENCODE_DISABLE_MODELS_FETCH: 'true',
+          OPENCODE_DISABLE_PRUNE: 'true',
+          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: 'true',
+          PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}`,
+        },
         timeout,
       },
       (error, stdout, stderr) => {
@@ -75,6 +94,10 @@ async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
         resolve(stdout);
       },
     );
+
+    // opencode reads piped stdin before sending the prompt. execFile creates a
+    // stdin pipe by default, so close it or opencode will wait forever in CI.
+    child.stdin?.end();
 
     const heartbeatMs = 60000;
     const heartbeat = setInterval(() => {
