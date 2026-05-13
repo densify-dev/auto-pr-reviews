@@ -30,7 +30,10 @@ async function checkConnections(logger) {
     { name: 'GitHub MCP', url: 'https://api.githubcopilot.com/mcp/' },
     { name: 'Context7 MCP', url: 'https://mcp.context7.com/mcp' },
     { name: 'npm registry', url: 'https://registry.npmjs.org/' },
-    { name: 'GitHub (ripgrep)', url: 'https://github.com' },
+    {
+      name: 'GitHub (ripgrep release)',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz',
+    },
   ];
 
   for (const ep of endpoints) {

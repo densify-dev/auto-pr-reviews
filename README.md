@@ -92,7 +92,7 @@ Required Bitbucket variables:
 Optional Bitbucket variables:
 
 - Repository or workspace variable: `DEBUG` with default `false`
-- Repository or workspace variable: `OPencode_TIMEOUT` — timeout in seconds for the review process (default: `600`)
+- Repository or workspace variable: `OPENCODE_TIMEOUT` — timeout in seconds for the review process (default: `600`)
 
 ## Bitbucket Pipeline Example
 
