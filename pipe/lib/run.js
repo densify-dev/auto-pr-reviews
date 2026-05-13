@@ -24,6 +24,28 @@ function getTimeout(env) {
   return 600000;
 }
 
+async function checkConnections(logger) {
+  const endpoints = [
+    { name: 'Bitbucket MCP', url: 'https://mcp.atlassian.com/v1/mcp' },
+    { name: 'GitHub MCP', url: 'https://api.githubcopilot.com/mcp/' },
+    { name: 'Context7 MCP', url: 'https://mcp.context7.com/mcp' },
+    { name: 'npm registry', url: 'https://registry.npmjs.org/' },
+    { name: 'GitHub (ripgrep)', url: 'https://github.com' },
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(ep.url, { method: 'HEAD', signal: controller.signal });
+      clearTimeout(timeout);
+      logger.info(`[connectivity] ${ep.name}: ${res.status} ${res.statusText} (${ep.url})`);
+    } catch (err) {
+      logger.info(`[connectivity] ${ep.name}: FAILED (${err.cause?.code || err.message}) (${ep.url})`);
+    }
+  }
+}
+
 async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
   return new Promise((resolve, reject) => {
     const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
@@ -118,6 +140,8 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
   }
 
   activeLogger.info(`Starting review for ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);
+
+  await checkConnections(activeLogger);
 
   await execImpl({
     repo: config.bitbucket.repo.fullName,
