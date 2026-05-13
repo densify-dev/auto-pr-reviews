@@ -21,7 +21,7 @@ function getTimeout(env) {
       return parsed * 1000;
     }
   }
-  return 600000;
+  return 900000;
 }
 
 async function checkConnections(logger) {
@@ -68,9 +68,6 @@ async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
         '--format',
         'json',
         '--dangerously-skip-permissions',
-        '--print-logs',
-        '--log-level',
-        'DEBUG',
       ],
       {
         env: {
