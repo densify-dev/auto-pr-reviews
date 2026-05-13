@@ -1,5 +1,5 @@
 const { execFile } = require('child_process');
-const { fetchPullRequest, classifyPullRequest } = require('./bitbucket');
+const { fetchCommit, fetchPullRequest, classifyPullRequest, hasAiReviewTag } = require('./bitbucket');
 const { readConfig } = require('./config');
 const { createLogger } = require('./log');
 
@@ -158,6 +158,28 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
       `Skipped because PR is not open: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber} (state=${decision.state})`,
     );
     return { outcome: 'skipped-not-open' };
+  }
+
+  const commitHash = pr.source?.commit?.hash;
+  if (!commitHash) {
+    throw new Error(
+      `Failed because Bitbucket PR is missing a source commit hash: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
+    );
+  }
+
+  const commit = await fetchCommit({
+    repoFullName: config.bitbucket.repo.fullName,
+    commitHash,
+    readToken: config.bitbucket.readToken,
+    fetchImpl,
+    logger: activeLogger,
+  });
+
+  if (!hasAiReviewTag(commit.message)) {
+    activeLogger.info(
+      `Skipped because source commit message does not contain [ai-review]: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber} (${commitHash})`,
+    );
+    return { outcome: 'skipped-no-ai-review-tag' };
   }
 
   activeLogger.info(`Starting review for ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);

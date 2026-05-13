@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { classifyPullRequest, fetchPullRequest } = require('../pipe/lib/bitbucket');
+const { classifyPullRequest, fetchPullRequest, hasAiReviewTag } = require('../pipe/lib/bitbucket');
 const { parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
 const { isDraftPullRequest } = require('../pipe/lib/draft');
 const { retryJson } = require('../pipe/lib/http');
@@ -62,6 +62,11 @@ test('classifyPullRequest skips non-open pull requests', () => {
     action: 'skip-closed',
     state: 'DECLINED',
   });
+});
+
+test('hasAiReviewTag detects the opt-in marker', () => {
+  assert.equal(hasAiReviewTag('feat: add API [ai-review]'), true);
+  assert.equal(hasAiReviewTag('feat: add API'), false);
 });
 
 test('retryJson retries transient failures and eventually succeeds', async () => {
@@ -132,7 +137,22 @@ test('runPipe runs opencode for an open non-draft pull request', async () => {
       },
       debug() {},
     },
-    fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: false }),
+    fetchImpl: async (url) => {
+      if (url.includes('/pullrequests/42')) {
+        return createJsonResponse(200, {
+          title: 'Feature',
+          state: 'OPEN',
+          draft: false,
+          source: { commit: { hash: 'abc123' } },
+        });
+      }
+
+      if (url.includes('/commit/abc123')) {
+        return createJsonResponse(200, { message: 'feat: add feature [ai-review]' });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    },
     execImpl: async ({ repo, prNumber, mcpToken, logger }) => {
       assert.equal(repo, 'workspace/service');
       assert.equal(prNumber, 42);
@@ -157,7 +177,22 @@ test('runPipe exits successfully for draft pull requests', async () => {
       },
       debug() {},
     },
-    fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'OPEN', draft: true }),
+    fetchImpl: async (url) => {
+      if (url.includes('/pullrequests/42')) {
+        return createJsonResponse(200, {
+          title: 'Feature',
+          state: 'OPEN',
+          draft: true,
+          source: { commit: { hash: 'abc123' } },
+        });
+      }
+
+      if (url.includes('/commit/abc123')) {
+        return createJsonResponse(200, { message: 'feat: add feature [ai-review]' });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    },
     execImpl: async () => {
       throw new Error('opencode should not be called');
     },
@@ -179,7 +214,22 @@ test('runPipe exits successfully for non-open pull requests', async () => {
       },
       debug() {},
     },
-    fetchImpl: async () => createJsonResponse(200, { title: 'Feature', state: 'MERGED', draft: false }),
+    fetchImpl: async (url) => {
+      if (url.includes('/pullrequests/42')) {
+        return createJsonResponse(200, {
+          title: 'Feature',
+          state: 'MERGED',
+          draft: false,
+          source: { commit: { hash: 'abc123' } },
+        });
+      }
+
+      if (url.includes('/commit/abc123')) {
+        return createJsonResponse(200, { message: 'feat: add feature [ai-review]' });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    },
     execImpl: async () => {
       throw new Error('opencode should not be called');
     },
@@ -187,6 +237,46 @@ test('runPipe exits successfully for non-open pull requests', async () => {
 
   assert.equal(result.outcome, 'skipped-not-open');
   assert.match(logs.find(l => l.includes('Skipped because PR is not open')), /Skipped because PR is not open/);
+});
+
+test('runPipe exits successfully when source commit is not tagged for AI review', async () => {
+  const env = createEnv();
+  const logs = [];
+
+  const result = await runPipe({
+    env,
+    logger: {
+      info(message) {
+        logs.push(message);
+      },
+      debug() {},
+    },
+    fetchImpl: async (url) => {
+      if (url.includes('/pullrequests/42')) {
+        return createJsonResponse(200, {
+          title: 'Feature',
+          state: 'OPEN',
+          draft: false,
+          source: { commit: { hash: 'abc123' } },
+        });
+      }
+
+      if (url.includes('/commit/abc123')) {
+        return createJsonResponse(200, { message: 'feat: add feature' });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+    execImpl: async () => {
+      throw new Error('opencode should not be called');
+    },
+  });
+
+  assert.equal(result.outcome, 'skipped-no-ai-review-tag');
+  assert.match(
+    logs.find(l => l.includes('source commit message does not contain [ai-review]')),
+    /source commit message does not contain \[ai-review\]/,
+  );
 });
 
 test('runPipe fails clearly on missing PR_REVIEW_BITBUCKET_PR_READ_TOKEN', async () => {
