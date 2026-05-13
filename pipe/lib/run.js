@@ -65,8 +65,6 @@ async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
         `Review ${reviewTarget}`,
         '--agent',
         'bitbucket-pr-review',
-        '--format',
-        'json',
         '--dangerously-skip-permissions',
       ],
       {
