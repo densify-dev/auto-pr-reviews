@@ -79,7 +79,7 @@ Bitbucket repositories use the published Bitbucket pipe instead of the reusable 
 The pipe:
 
 - Reads the Bitbucket PR state
-- Reads the current source commit message and only reviews when it contains `[ai-review]`
+- Reads the running pipeline commit message, falling back to the PR source commit when needed, and only reviews when it contains `[ai-review]`
 - Runs `opencode` directly to perform the review
 - Exits `0` for draft, non-open, or non-tagged pull requests
 - Exits non-zero if the review fails

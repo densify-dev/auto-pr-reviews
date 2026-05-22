@@ -160,12 +160,16 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
     return { outcome: 'skipped-not-open' };
   }
 
-  const commitHash = pr.source?.commit?.hash;
+  const commitHash = config.bitbucket.pipelineCommitHash || pr.source?.commit?.hash;
   if (!commitHash) {
     throw new Error(
-      `Failed because Bitbucket PR is missing a source commit hash: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
+      `Failed because Bitbucket pipeline commit and PR source commit hash are both missing: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
     );
   }
+
+  activeLogger.info(
+    `Using commit for AI review tag check: ${commitHash}${config.bitbucket.pipelineCommitHash ? ' (from BITBUCKET_COMMIT)' : ' (from PR source)'}`,
+  );
 
   const commit = await fetchCommit({
     repoFullName: config.bitbucket.repo.fullName,
@@ -177,7 +181,7 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl 
 
   if (!hasAiReviewTag(commit.message)) {
     activeLogger.info(
-      `Skipped because source commit message does not contain [ai-review]: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber} (${commitHash})`,
+      `Skipped because selected commit message does not contain [ai-review]: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber} (${commitHash})`,
     );
     return { outcome: 'skipped-no-ai-review-tag' };
   }

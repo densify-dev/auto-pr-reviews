@@ -274,9 +274,56 @@ test('runPipe exits successfully when source commit is not tagged for AI review'
 
   assert.equal(result.outcome, 'skipped-no-ai-review-tag');
   assert.match(
-    logs.find(l => l.includes('source commit message does not contain [ai-review]')),
-    /source commit message does not contain \[ai-review\]/,
+    logs.find(l => l.includes('selected commit message does not contain [ai-review]')),
+    /selected commit message does not contain \[ai-review\]/,
   );
+});
+
+test('runPipe prefers BITBUCKET_COMMIT over the latest PR source commit', async () => {
+  const env = createEnv({ BITBUCKET_COMMIT: 'pipeline123' });
+  const logs = [];
+  let execCalled = false;
+
+  const result = await runPipe({
+    env,
+    logger: {
+      info(message) {
+        logs.push(message);
+      },
+      debug() {},
+    },
+    fetchImpl: async (url) => {
+      if (url.includes('/pullrequests/42')) {
+        return createJsonResponse(200, {
+          title: 'Feature',
+          state: 'OPEN',
+          draft: false,
+          source: { commit: { hash: 'latest456' } },
+        });
+      }
+
+      if (url.includes('/commit/pipeline123')) {
+        return createJsonResponse(200, { message: 'feat: pipeline commit [ai-review]' });
+      }
+
+      if (url.includes('/commit/latest456')) {
+        return createJsonResponse(200, { message: 'feat: latest branch commit' });
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
+    },
+    execImpl: async () => {
+      execCalled = true;
+    },
+  });
+
+  assert.equal(result.outcome, 'reviewed');
+  assert.equal(execCalled, true);
+  assert.match(
+    logs.find(l => l.includes('Using commit for AI review tag check')),
+    /pipeline123 \(from BITBUCKET_COMMIT\)/,
+  );
+  assert.equal(logs.some(l => l.includes('latest456')), false);
 });
 
 test('runPipe fails clearly on missing PR_REVIEW_BITBUCKET_PR_READ_TOKEN', async () => {
