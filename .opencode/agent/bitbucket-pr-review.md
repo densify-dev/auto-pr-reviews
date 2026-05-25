@@ -47,6 +47,7 @@ Data collection workflow (via `bitbucket`)
    - `bitbucket_bitbucketPullRequest` action `diff`
 3) Fetch existing PR comments:
    - `bitbucket_bitbucketPullRequest` action `comments`
+   - Treat the API response as the source of truth for comment URLs. If a comment object includes a canonical HTML link, reuse that exact URL in summaries.
 4) If needed for deeper context, fetch specific files from source/target refs:
    - `bitbucket_bitbucketRepoContent` action `files.get`
 
@@ -99,7 +100,12 @@ Overall assessment: <1-3 sentences>
 Risk level: Low | Medium | High
 
 Existing feedback report:
-<table with columns: Issue, Status>
+<table with columns: Issue, Status, Reference>
+
+Reference column rules:
+- If the comment payload includes an HTML URL, use a markdown link such as `[comment](https://bitbucket.org/...)` pointing to that exact URL.
+- Never synthesize comment links from numeric IDs.
+- If no canonical URL is available, render a non-linking identifier such as ``comment id 799867345`` instead of bare `(799867345)` or a guessed URL.
 
 New findings (this round):
 <table with: Severity, Issue, Location>
@@ -119,6 +125,7 @@ Posting protocol
 2) Post exactly one global summary comment at the end.
 3) Always add a reply to comments that does not have the latest status about its resolution.
 4) Always post the summary last
+5) In the summary table, never place a bare numeric comment ID next to an issue title because Bitbucket may auto-link it as a commit.
 
 
 Final response to caller
