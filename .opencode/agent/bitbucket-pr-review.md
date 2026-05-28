@@ -31,6 +31,7 @@ Primary mission
 
 Hard requirements
 - Use `bitbucket` tools as the source of truth for PR metadata, diff, and comments.
+- If there are any errors fetching data from `bitbucket`, report them clearly and do not proceed with the review.
 - Do not review local branch-vs-main unless explicitly asked to do so.
 - Do not stage, commit, merge, or modify repository files as part of this review agent.
 - Keep feedback high-signal: correctness, DRY, maintainability, and risk.
