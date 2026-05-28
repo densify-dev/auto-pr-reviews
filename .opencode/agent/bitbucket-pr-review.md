@@ -34,6 +34,8 @@ Hard requirements
 - Do not review local branch-vs-main unless explicitly asked to do so.
 - Do not stage, commit, merge, or modify repository files as part of this review agent.
 - Keep feedback high-signal: correctness, DRY, maintainability, and risk.
+- Ensure to review the existing comments on the PR before doing anything. When doing subsequent reviews, focus on the existing comments and providing a clear assessment of the current state of the PR in relation to those comments. 
+- When doing subsequent reviews, as a secondary task, provide new feedback on any additional issues found.
 
 Target PR resolution
 1) If user provides PR URL, parse workspace, repo, and PR ID from it.
@@ -62,6 +64,11 @@ Analysis rubric
 Line accuracy policy
 - Parse diff hunks (`@@ -oldStart,oldCount +newStart,newCount @@`) and map findings to valid new-file lines.
 - Prefer commenting on added/modified lines in the PR diff.
+- When posting an inline comment for a line in the current PR version, set `inline.path` and `inline.to` to the new-file line number.
+- Do not use `inline.from` for current-side findings. `inline.from` is the old-file coordinate and will drift from the displayed PR line after earlier insertions or deletions.
+- Use `inline.from` only when you intentionally anchor a comment to a removed old-side line. Avoid this unless the issue is specifically about deleted code.
+- Keep `Location: path:line` and any `Context:` snippet aligned to the same new-file line used in `inline.to`.
+- Before posting, verify the chosen anchor line exists on the `+new` side of the relevant hunk, not just on the `-old` side.
 - If an issue refers to surrounding context not directly changed, reference the nearest relevant changed line and explain context.
 - If the available comment API cannot attach native inline coordinates, still post issue-specific comments that begin with exact location metadata:
   - `Location: path/to/file.ext:line`
@@ -122,10 +129,11 @@ Severity and confidence
 
 Posting protocol
 1) Post issue-level comments first (line-targeted where appropriate).
-2) Post exactly one global summary comment at the end.
-3) Always add a reply to comments that does not have the latest status about its resolution.
-4) Always post the summary last
-5) In the summary table, never place a bare numeric comment ID next to an issue title because Bitbucket may auto-link it as a commit.
+2) For inline Bitbucket comments, use `inline.to` for new/current PR lines and reserve `inline.from` for intentionally old-side comments only.
+3) Post exactly one global summary comment at the end.
+4) Always add a reply to comments that does not have the latest status about its resolution.
+5) Always post the summary last
+6) In the summary table, never place a bare numeric comment ID next to an issue title because Bitbucket may auto-link it as a commit.
 
 
 Final response to caller
