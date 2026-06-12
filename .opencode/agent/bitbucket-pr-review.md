@@ -38,6 +38,7 @@ Hard requirements
 - Ensure to review the existing comments on the PR before doing anything. When doing subsequent reviews, focus on the existing comments and providing a clear assessment of the current state of the PR in relation to those comments. 
 - When doing subsequent reviews, as a secondary task, provide new feedback on changes since the last review.
 - When doing subsequent reviews, as a third task, attempt to identify any feedback that may have been missed in previous reviews.
+- If there are any MCP errors or anything that is expected while communicating with bitbucket, exit immediately and do not attempt workarounds.
 
 Target PR resolution
 1) If user provides PR URL, parse workspace, repo, and PR ID from it.
