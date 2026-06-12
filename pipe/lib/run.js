@@ -1,18 +1,142 @@
-const { fetchPullRequest, classifyPullRequest } = require('./bitbucket');
+const { execFile } = require('child_process');
+const { fetchCommit, fetchPullRequest, classifyPullRequest, hasAiReviewTag } = require('./bitbucket');
 const { readConfig } = require('./config');
-const {
-  createAppJwt,
-  lookupInstallationId,
-  createInstallationToken,
-  buildDispatchPayload,
-  sendDispatch,
-} = require('./github');
 const { createLogger } = require('./log');
 
-async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
+function logOpencodeEnv(env, logger) {
+  const opencodeVars = ['BB_MCP_TOKEN', 'AWS_BEARER_TOKEN_BEDROCK', 'GH_MCP_TOKEN'];
+  for (const name of opencodeVars) {
+    if (env[name]) {
+      logger.info(`${name}=<set (${env[name].length} chars)>`);
+    } else {
+      logger.info(`${name}=<NOT SET>`);
+    }
+  }
+}
+
+function getTimeout(env) {
+  if (env.OPENCODE_TIMEOUT) {
+    const parsed = Number.parseInt(env.OPENCODE_TIMEOUT, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed * 1000;
+    }
+  }
+  return 900000;
+}
+
+async function checkConnections(logger) {
+  const endpoints = [
+    { name: 'Bitbucket MCP', url: 'https://mcp.atlassian.com/v1/mcp' },
+    { name: 'GitHub MCP', url: 'https://api.githubcopilot.com/mcp/' },
+    { name: 'Context7 MCP', url: 'https://mcp.context7.com/mcp' },
+    { name: 'npm registry', url: 'https://registry.npmjs.org/' },
+    {
+      name: 'GitHub (ripgrep release)',
+      url: 'https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz',
+    },
+  ];
+
+  for (const ep of endpoints) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(ep.url, { method: 'HEAD', signal: controller.signal });
+      clearTimeout(timeout);
+      logger.info(`[connectivity] ${ep.name}: ${res.status} ${res.statusText} (${ep.url})`);
+    } catch (err) {
+      logger.info(`[connectivity] ${ep.name}: FAILED (${err.cause?.code || err.message}) (${ep.url})`);
+    }
+  }
+}
+
+async function runOpencode({ repo, prNumber, mcpToken, logger, env }) {
+  return new Promise((resolve, reject) => {
+    const reviewTarget = `https://bitbucket.org/${repo}/pull-requests/${prNumber}`;
+    const timeout = getTimeout(env);
+    const timeoutMinutes = Math.round(timeout / 60000);
+
+    logger.info(`opencode timeout: ${timeoutMinutes} minute(s)`);
+    logOpencodeEnv(env, logger);
+
+    const child = execFile(
+      'opencode',
+      [
+        'run',
+        `Review ${reviewTarget}`,
+        '--agent',
+        'bitbucket-pr-review',
+        '--dangerously-skip-permissions',
+      ],
+      {
+        env: {
+          ...process.env,
+          BB_MCP_TOKEN: mcpToken,
+          OPENCODE_DISABLE_AUTOUPDATE: 'true',
+          OPENCODE_DISABLE_MODELS_FETCH: 'true',
+          OPENCODE_DISABLE_PRUNE: 'true',
+          OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: 'true',
+          PATH: `${process.env.HOME}/.opencode/bin:${process.env.PATH}`,
+        },
+        timeout,
+      },
+      (error, stdout, stderr) => {
+        if (error) {
+          const reason = error.killed ? 'timed out' : `exited with code ${error.code}`;
+          reject(new Error(`opencode ${reason}: ${stderr || error.message}`));
+          return;
+        }
+        logger.info(`opencode completed`);
+        resolve(stdout);
+      },
+    );
+
+    // opencode reads piped stdin before sending the prompt. execFile creates a
+    // stdin pipe by default, so close it or opencode will wait forever in CI.
+    child.stdin?.end();
+
+    const heartbeatMs = 60000;
+    const heartbeat = setInterval(() => {
+      logger.info(`[heartbeat] opencode still running (pid=${child.pid})...`);
+    }, heartbeatMs);
+
+    const clearHeartbeat = () => {
+      clearInterval(heartbeat);
+    };
+
+    child.on('spawn', () => {
+      logger.info(`opencode process started: Review ${reviewTarget}`);
+    });
+
+    child.stdout.on('data', (chunk) => {
+      const line = chunk.toString();
+      if (line.trim()) {
+        logger.info(line.trim());
+      }
+    });
+
+    child.stderr.on('data', (chunk) => {
+      const line = chunk.toString();
+      if (line.trim()) {
+        logger.info(line.trim());
+      }
+    });
+
+    child.on('error', (error) => {
+      logger.info(`opencode error: ${error.message}`);
+    });
+
+    child.on('exit', (code) => {
+      clearHeartbeat();
+      logger.info(`opencode exited with code ${code}`);
+    });
+  });
+}
+
+async function runPipe({ env = process.env, fetchImpl = fetch, logger, execImpl = runOpencode } = {}) {
   const config = readConfig(env);
   const activeLogger = logger || createLogger({ debug: config.debug });
 
+  activeLogger.info(`Fetching PR: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);
   const pr = await fetchPullRequest({
     repoFullName: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
@@ -36,44 +160,49 @@ async function runPipe({ env = process.env, fetchImpl = fetch, logger } = {}) {
     return { outcome: 'skipped-not-open' };
   }
 
-  const appJwt = createAppJwt(config.appClientId, config.appPrivateKey);
-  const installationId = await lookupInstallationId({
-    githubApiUrl: config.githubApiUrl,
-    centralRepo: config.centralRepo,
-    appJwt,
+  const commitHash = config.bitbucket.pipelineCommitHash || pr.source?.commit?.hash;
+  if (!commitHash) {
+    throw new Error(
+      `Failed because Bitbucket pipeline commit and PR source commit hash are both missing: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`,
+    );
+  }
+
+  activeLogger.info(
+    `Using commit for AI review tag check: ${commitHash}${config.bitbucket.pipelineCommitHash ? ' (from BITBUCKET_COMMIT)' : ' (from PR source)'}`,
+  );
+
+  const commit = await fetchCommit({
+    repoFullName: config.bitbucket.repo.fullName,
+    commitHash,
+    readToken: config.bitbucket.readToken,
     fetchImpl,
     logger: activeLogger,
   });
 
-  const installationToken = await createInstallationToken({
-    githubApiUrl: config.githubApiUrl,
-    installationId,
-    centralRepo: config.centralRepo,
-    appJwt,
-    fetchImpl,
-    logger: activeLogger,
-  });
+  if (!hasAiReviewTag(commit.message)) {
+    activeLogger.info(
+      `Skipped because selected commit message does not contain [ai-review]: ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber} (${commitHash})`,
+    );
+    return { outcome: 'skipped-no-ai-review-tag' };
+  }
 
-  const payload = buildDispatchPayload({
-    eventType: config.eventType,
-    bitbucketRepo: config.bitbucket.repo.fullName,
+  activeLogger.info(`Starting review for ${config.bitbucket.repo.fullName}#${config.bitbucket.prNumber}`);
+
+  await checkConnections(activeLogger);
+
+  await execImpl({
+    repo: config.bitbucket.repo.fullName,
     prNumber: config.bitbucket.prNumber,
-  });
-
-  await sendDispatch({
-    githubApiUrl: config.githubApiUrl,
-    centralRepo: config.centralRepo,
-    installationToken,
-    payload,
-    fetchImpl,
+    mcpToken: config.opencode.mcpToken,
     logger: activeLogger,
+    env,
   });
 
   activeLogger.info(
-    `Dispatched successfully: repo=${config.bitbucket.repo.fullName} pr=${config.bitbucket.prNumber}`,
+    `Review completed: repo=${config.bitbucket.repo.fullName} pr=${config.bitbucket.prNumber}`,
   );
 
-  return { outcome: 'dispatched', payload };
+  return { outcome: 'reviewed' };
 }
 
 module.exports = {

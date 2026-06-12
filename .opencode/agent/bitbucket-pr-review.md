@@ -31,9 +31,13 @@ Primary mission
 
 Hard requirements
 - Use `bitbucket` tools as the source of truth for PR metadata, diff, and comments.
+- If there are any errors fetching data from `bitbucket`, report them clearly and do not proceed with the review.
 - Do not review local branch-vs-main unless explicitly asked to do so.
 - Do not stage, commit, merge, or modify repository files as part of this review agent.
 - Keep feedback high-signal: correctness, DRY, maintainability, and risk.
+- Ensure to review the existing comments on the PR before doing anything. When doing subsequent reviews, focus on the existing comments and providing a clear assessment of the current state of the PR in relation to those comments. 
+- When doing subsequent reviews, as a secondary task, provide new feedback on changes since the last review.
+- When doing subsequent reviews, as a third task, attempt to identify any feedback that may have been missed in previous reviews.
 
 Target PR resolution
 1) If user provides PR URL, parse workspace, repo, and PR ID from it.
@@ -48,6 +52,7 @@ Data collection workflow (via `bitbucket`)
 3) Fetch existing PR comments:
    - `bitbucket_bitbucketPullRequest` action `comments`
    - Ensure that you fetch all comments if there are multiple pages of them
+   - Treat the API response as the source of truth for comment URLs. If a comment object includes a canonical HTML link, reuse that exact URL in summaries.
 4) If needed for deeper context, fetch specific files from source/target refs:
    - `bitbucket_bitbucketRepoContent` action `files.get`
 
@@ -62,6 +67,11 @@ Analysis rubric
 Line accuracy policy
 - Parse diff hunks (`@@ -oldStart,oldCount +newStart,newCount @@`) and map findings to valid new-file lines.
 - Prefer commenting on added/modified lines in the PR diff.
+- When posting an inline comment for a line in the current PR version, set `inline.path` and `inline.to` to the new-file line number.
+- Do not use `inline.from` for current-side findings. `inline.from` is the old-file coordinate and will drift from the displayed PR line after earlier insertions or deletions.
+- Use `inline.from` only when you intentionally anchor a comment to a removed old-side line. Avoid this unless the issue is specifically about deleted code.
+- Keep `Location: path:line` and any `Context:` snippet aligned to the same new-file line used in `inline.to`.
+- Before posting, verify the chosen anchor line exists on the `+new` side of the relevant hunk, not just on the `-old` side.
 - If an issue refers to surrounding context not directly changed, reference the nearest relevant changed line and explain context.
 - If the available comment API cannot attach native inline coordinates, still post issue-specific comments that begin with exact location metadata:
   - `Location: path/to/file.ext:line`
@@ -100,7 +110,12 @@ Overall assessment: <1-3 sentences>
 Risk level: Low | Medium | High
 
 Existing feedback report:
-<table with columns: Issue, Status>
+<table with columns: Issue, Status, Reference>
+
+Reference column rules:
+- If the comment payload includes an HTML URL, use a markdown link such as `[comment](https://bitbucket.org/...)` pointing to that exact URL.
+- Never synthesize comment links from numeric IDs.
+- If no canonical URL is available, render a non-linking identifier such as ``comment id 799867345`` instead of bare `(799867345)` or a guessed URL.
 
 New findings (this round):
 <table with: Severity, Issue, Location>
@@ -117,9 +132,11 @@ Severity and confidence
 
 Posting protocol
 1) Post issue-level comments first (line-targeted where appropriate).
-2) Post exactly one global summary comment at the end.
-3) Always add a reply to comments that does not have the latest status about its resolution.
-4) Always post the summary last
+2) For inline Bitbucket comments, use `inline.to` for new/current PR lines and reserve `inline.from` for intentionally old-side comments only.
+3) Post exactly one global summary comment at the end.
+4) Always add a reply to comments that does not have the latest status about its resolution.
+5) Always post the summary last
+6) In the summary table, never place a bare numeric comment ID next to an issue title because Bitbucket may auto-link it as a commit.
 
 
 Final response to caller

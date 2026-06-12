@@ -1,19 +1,18 @@
 name: Auto PR Reviews Bitbucket Pipe
 image: ghcr.io/densify-dev/auto-pr-reviews-bitbucket-pipe
-description: Dispatch Bitbucket pull requests to the central auto-pr-reviews repository.
+description: Run automated PR reviews on Bitbucket pull requests using opencode.
 category: Utility
 variables:
-  - name: PR_REVIEW_DISPATCH_APP_CLIENT_ID
-    required: true
-  - name: PR_REVIEW_DISPATCH_APP_PRIVATE_KEY_B64
-    required: true
-  - name: PR_REVIEW_CENTRAL_REPO
+  - name: BB_MCP_TOKEN
     required: true
   - name: PR_REVIEW_BITBUCKET_PR_READ_TOKEN
     required: true
-  - name: PR_REVIEW_EVENT_TYPE
-    default: pr-review-request
-  - name: PR_REVIEW_GITHUB_API_URL
-    default: https://api.github.com
+  - name: AWS_BEARER_TOKEN_BEDROCK
+    required: true
+    description: "Token for Amazon Bedrock to run Claude Sonnet 4.6"
   - name: DEBUG
     default: "false"
+  - name: OPENCODE_TIMEOUT
+    description: "Timeout in seconds for the opencode review process (default: 600)"
+
+

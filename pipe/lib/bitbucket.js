@@ -24,6 +24,33 @@ async function fetchPullRequest({ repoFullName, prNumber, readToken, fetchImpl =
   return response.body;
 }
 
+async function fetchCommit({ repoFullName, commitHash, readToken, fetchImpl = fetch, logger }) {
+  const url = `https://api.bitbucket.org/2.0/repositories/${repoFullName}/commit/${commitHash}`;
+
+  const response = await retryJson({
+    attempts: 3,
+    url,
+    method: 'GET',
+    token: readToken,
+    headers: {
+      Accept: 'application/json',
+    },
+    fetchImpl,
+    logger,
+  });
+
+  if (!response.ok) {
+    const detail = response.status ? ` (HTTP ${response.status})` : '';
+    throw new Error(`Failed because Bitbucket commit lookup failed: ${repoFullName}@${commitHash}${detail}`);
+  }
+
+  return response.body;
+}
+
+function hasAiReviewTag(message) {
+  return typeof message === 'string' && message.includes('[ai-review]');
+}
+
 function classifyPullRequest(pr) {
   if (isDraftPullRequest(pr)) {
     return { action: 'skip-draft' };
@@ -38,5 +65,7 @@ function classifyPullRequest(pr) {
 
 module.exports = {
   classifyPullRequest,
+  fetchCommit,
   fetchPullRequest,
+  hasAiReviewTag,
 };
