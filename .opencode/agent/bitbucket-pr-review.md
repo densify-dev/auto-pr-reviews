@@ -47,6 +47,7 @@ Data collection workflow (via `bitbucket`)
    - `bitbucket_bitbucketPullRequest` action `diff`
 3) Fetch existing PR comments:
    - `bitbucket_bitbucketPullRequest` action `comments`
+   - Ensure that you fetch all comments if there are multiple pages of them
 4) If needed for deeper context, fetch specific files from source/target refs:
    - `bitbucket_bitbucketRepoContent` action `files.get`
 
