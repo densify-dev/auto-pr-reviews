@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { classifyPullRequest, fetchPullRequest, hasAiReviewTag } = require('../pipe/lib/bitbucket');
 const { parseRepo, parsePositiveInteger } = require('../pipe/lib/config');
@@ -30,6 +32,15 @@ function createJsonResponse(status, body) {
     },
   };
 }
+
+test('review agents use GPT-5.6 Luna with maximum reasoning', () => {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '.opencode', 'opencode.json'), 'utf8'));
+
+  for (const agentName of ['github-pr-review', 'bitbucket-pr-review']) {
+    assert.equal(config.agent[agentName].model, 'amazon-bedrock/openai.gpt-5.6-luna');
+    assert.equal(config.agent[agentName].reasoningEffort, 'max');
+  }
+});
 
 test('parseRepo accepts owner/name values', () => {
   assert.deepEqual(parseRepo('workspace/repo', 'BITBUCKET_REPO_FULL_NAME'), {

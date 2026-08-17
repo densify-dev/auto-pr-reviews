@@ -47,7 +47,7 @@ jobs:
           node-version: 22
 
       - name: Install OpenCode
-        run: npm install -g opencode-ai@1.14.24
+        run: npm install -g opencode-ai@1.18.18
 
       - name: Validate request
         id: target-repo

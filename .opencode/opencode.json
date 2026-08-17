@@ -6,11 +6,13 @@
   "agent": {
     "bitbucket-pr-review": {
       "mode": "primary",
-      "model": "amazon-bedrock/us.anthropic.claude-sonnet-4-6"
+      "model": "amazon-bedrock/openai.gpt-5.6-luna",
+      "reasoningEffort": "max"
     },
     "github-pr-review": {
       "mode": "primary",
-      "model": "amazon-bedrock/us.anthropic.claude-sonnet-4-6"
+      "model": "amazon-bedrock/openai.gpt-5.6-luna",
+      "reasoningEffort": "max"
     }
   },
   "instructions": [],
