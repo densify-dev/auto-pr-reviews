@@ -42,6 +42,16 @@ test('review agents use GPT-5.6 Luna with maximum reasoning', () => {
   }
 });
 
+test('Bitbucket reviewer has bounded evidence fallback rules', () => {
+  const prompt = fs.readFileSync(path.join(__dirname, '..', '.opencode', 'agent', 'bitbucket-pr-review.md'), 'utf8');
+
+  assert.doesNotMatch(prompt, /If there are any MCP errors[\s\S]*exit immediately/i);
+  assert.match(prompt, /Required evidence:[\s\S]*PR metadata[\s\S]*complete diff[\s\S]*existing comments/i);
+  assert.match(prompt, /Optional evidence:[\s\S]*deeper source\/target file context/i);
+  assert.match(prompt, /raw `files\.get` calls[\s\S]*omit `format`/i);
+  assert.match(prompt, /one corrected retry/i);
+});
+
 test('parseRepo accepts owner/name values', () => {
   assert.deepEqual(parseRepo('workspace/repo', 'BITBUCKET_REPO_FULL_NAME'), {
     owner: 'workspace',
