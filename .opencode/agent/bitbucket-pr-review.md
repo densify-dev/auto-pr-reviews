@@ -88,6 +88,8 @@ Line accuracy policy
 
 Comment templates
 
+Use emojis such as a green checkmark or red X to emphasize the good/bad or resolved/unresolved content.
+
 Line-targeted issue comment (or location-fallback comment):
 ~~~
 [Severity: Major] [Confidence: High]
