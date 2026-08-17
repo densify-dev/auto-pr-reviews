@@ -114,10 +114,11 @@ Suggested change:
 Global PR summary comment:
 ```
 Overall assessment: <1-3 sentences>
+
 Risk level: Low | Medium | High
 
 Existing feedback report:
-<table with columns: Issue, Status, Reference>
+<table with columns: Issue, Is resolved?, Status, Reference>
 
 Reference column rules:
 - If the comment payload includes an HTML URL, use a markdown link such as `[comment](https://bitbucket.org/...)` pointing to that exact URL.
