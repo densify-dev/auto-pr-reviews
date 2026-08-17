@@ -31,4 +31,4 @@ jobs:
         run: docker build -t auto-pr-reviews-bitbucket-pipe:test .
 
       - name: Verify git is available in pipe image
-        run: docker run --rm auto-pr-reviews-bitbucket-pipe:test git --version
+        run: docker run --rm --entrypoint git auto-pr-reviews-bitbucket-pipe:test --version

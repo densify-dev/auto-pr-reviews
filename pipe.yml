@@ -9,7 +9,7 @@ variables:
     required: true
   - name: AWS_BEARER_TOKEN_BEDROCK
     required: true
-    description: "Token for Amazon Bedrock to run Claude Sonnet 4.6"
+    description: "Token for Amazon Bedrock to access models"
   - name: DEBUG
     default: "false"
   - name: OPENCODE_TIMEOUT
