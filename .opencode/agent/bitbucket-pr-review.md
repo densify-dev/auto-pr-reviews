@@ -88,8 +88,6 @@ Line accuracy policy
 
 Comment templates
 
-Use emojis such as a green checkmark or red X to emphasize the good/bad or resolved/unresolved content.
-
 Line-targeted issue comment (or location-fallback comment):
 ~~~
 [Severity: Major] [Confidence: High]
@@ -134,6 +132,8 @@ DRY improvement opportunities:
 <table with columns: Impact (high, medium, low), Suggestion>
 
 ```
+
+For all templates above, ensure you use colored emojis such as a green checkmark or red cross mark to emphasize the actions to take. Especially for "Is  resolved?", it should be clear to understand at a glance what requires the attention.
 
 Severity and confidence
 - Severity: Critical | Major | Minor
