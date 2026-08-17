@@ -88,7 +88,7 @@ Required Bitbucket variables:
 
 - Secured repository or workspace variable: `BB_MCP_TOKEN`
 - Secured repository or workspace variable: `PR_REVIEW_BITBUCKET_PR_READ_TOKEN`
-- Secured repository or workspace variable: `AWS_BEARER_TOKEN_BEDROCK` — token for Amazon Bedrock to run GPT-5.6 Luna
+- Secured repository or workspace variable: `AWS_BEARER_TOKEN_BEDROCK` — token for Amazon Bedrock to access models
 
 Optional Bitbucket variables:
 
