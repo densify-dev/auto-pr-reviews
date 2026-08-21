@@ -77,7 +77,19 @@ test('Bitbucket reviewer summary templates use renderable Markdown tables', () =
       /^\|.*(?:\[[^\]\n]+\]|None|N\/A).*\|$/,
       `${label} must have a placeholder data row on its own line`,
     );
+    assert.equal(lines[labelLine + 5], '', `${label} table must be followed by a blank line`);
   }
+
+  assert.match(
+    prompt,
+    /- Use a `None` or `N\/A` row when a section has no entries\./,
+    'empty summary sections must use a None or N\/A row',
+  );
+  assert.match(
+    prompt,
+    /\| \[Issue summary\] \| ✅ Resolved or ❌ Unresolved \|/,
+    'existing feedback statuses must include both ✅ and ❌ markers',
+  );
 });
 
 test('parseRepo accepts owner/name values', () => {
