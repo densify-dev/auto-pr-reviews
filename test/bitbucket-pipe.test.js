@@ -52,6 +52,34 @@ test('Bitbucket reviewer has bounded evidence fallback rules', () => {
   assert.match(prompt, /one corrected retry/i);
 });
 
+test('Bitbucket reviewer summary templates use renderable Markdown tables', () => {
+  const prompt = fs.readFileSync(path.join(__dirname, '..', '.opencode', 'agent', 'bitbucket-pr-review.md'), 'utf8');
+  const lines = prompt.split(/\r?\n/);
+  const sections = [
+    ['Existing feedback report:', '| Issue | Is resolved? | Status | Reference |'],
+    ['New findings (this round):', '| Severity | Issue | Location |'],
+    ['DRY improvement opportunities:', '| Impact (high, medium, low) | Suggestion |'],
+  ];
+
+  for (const [label, header] of sections) {
+    const labelLine = lines.indexOf(label);
+
+    assert.notEqual(labelLine, -1, `missing summary section: ${label}`);
+    assert.equal(lines[labelLine + 1], '', `${label} must be followed by a blank line`);
+    assert.equal(lines[labelLine + 2], header, `${label} must have an explicit table header`);
+    assert.match(
+      lines[labelLine + 3],
+      /^\|\s*:?-{3,}\s*(?:\|\s*:?-{3,}\s*)+\|$/,
+      `${label} must have a separator row on its own line`,
+    );
+    assert.match(
+      lines[labelLine + 4],
+      /^\|.*(?:\[[^\]\n]+\]|None|N\/A).*\|$/,
+      `${label} must have a placeholder data row on its own line`,
+    );
+  }
+});
+
 test('parseRepo accepts owner/name values', () => {
   assert.deepEqual(parseRepo('workspace/repo', 'BITBUCKET_REPO_FULL_NAME'), {
     owner: 'workspace',
