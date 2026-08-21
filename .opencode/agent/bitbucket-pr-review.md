@@ -145,6 +145,7 @@ Formatting rules:
 - Leave one blank line before and after each table.
 - Never append a table to a section label. Put the label, blank line, then table.
 - Use a `None` or `N/A` row when a section has no entries.
+- Before rendering a row, escape each literal `|` in cell values as `\|` and replace embedded newlines with spaces.
 
 ```
 

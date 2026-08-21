@@ -90,6 +90,10 @@ test('Bitbucket reviewer summary templates use renderable Markdown tables', () =
     /\| \[Issue summary\] \| ✅ Resolved or ❌ Unresolved \|/,
     'existing feedback statuses must include both ✅ and ❌ markers',
   );
+  assert.ok(
+    prompt.includes('- Before rendering a row, escape each literal `|` in cell values as `\\|` and replace embedded newlines with spaces.'),
+    'cell values must escape pipes and normalize embedded newlines',
+  );
 });
 
 test('parseRepo accepts owner/name values', () => {
