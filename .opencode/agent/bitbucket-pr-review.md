@@ -118,7 +118,10 @@ Overall assessment: <1-3 sentences>
 Risk level: Low | Medium | High
 
 Existing feedback report:
-<table with columns: Issue, Is resolved?, Status, Reference>
+
+| Issue | Is resolved? | Status | Reference |
+| --- | --- | --- | --- |
+| [Issue summary] | ✅ Resolved or ❌ Unresolved | [Current status] | [Exact comment link or identifier] |
 
 Reference column rules:
 - If the comment payload includes an HTML URL, use a markdown link such as `[comment](https://bitbucket.org/...)` pointing to that exact URL.
@@ -126,14 +129,32 @@ Reference column rules:
 - If no canonical URL is available, render a non-linking identifier such as ``comment id 799867345`` instead of bare `(799867345)` or a guessed URL.
 
 New findings (this round):
-<table with: Severity, Issue, Location>
+
+| Severity | Issue | Location |
+| --- | --- | --- |
+| [Critical, Major, or Minor] | [Issue summary] | [path:line or global] |
 
 DRY improvement opportunities:
-<table with columns: Impact (high, medium, low), Suggestion>
+
+| Impact (high, medium, low) | Suggestion |
+| --- | --- |
+| [high, medium, or low] | [Specific refactoring opportunity] |
+
+Formatting rules:
+- Put every table row on its own line.
+- Leave one blank line before and after each table.
+- Never append a table to a section label. Put the label, blank line, then table.
+- Use a `None` or `N/A` row when a section has no entries.
+- Before rendering a row, escape each literal `|` in cell values as `\|` and replace embedded newlines with spaces.
 
 ```
 
-For all templates above, ensure you use colored emojis such as a green checkmark or red cross mark to emphasize the actions to take. Especially for "Is  resolved?", it should be clear to understand at a glance what requires the attention.
+For all templates above, use colored emojis such as ✅ and ❌ to make statuses and actions clear. In particular, use ✅ for resolved existing feedback and ❌ for unresolved existing feedback.
+
+Before posting the summary comment, perform this final formatting check:
+- Confirm each of the three section labels is on its own line and followed by a blank line.
+- Confirm each table has a header row, a separator row, and one row per entry.
+- Confirm every table row is on its own line and each empty section uses `None` or `N/A`.
 
 Severity and confidence
 - Severity: Critical | Major | Minor
